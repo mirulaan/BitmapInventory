@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Brand;
 use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Models\Location;
@@ -37,7 +38,7 @@ class ProductCatalogTest extends TestCase
         $targetBytes = $sizeKilobytes * 1024;
         $padding = $targetBytes > strlen($pngBase) ? str_repeat('0', $targetBytes - strlen($pngBase)) : '';
 
-        return UploadedFile::fake()->createWithContent($filename, $pngBase . $padding);
+        return UploadedFile::fake()->createWithContent($filename, $pngBase.$padding);
     }
 
     public function test_user_can_view_product_catalog_index(): void
@@ -67,7 +68,7 @@ class ProductCatalogTest extends TestCase
 
     public function test_product_create_page_renders_brand_dropdown_select(): void
     {
-        \App\Models\Brand::create(['name' => 'Computar Optics']);
+        Brand::create(['name' => 'Computar Optics']);
 
         $response = $this->get(route('products.create'));
 
@@ -441,5 +442,51 @@ class ProductCatalogTest extends TestCase
         // Sort by Brand Descending
         $sortDescResponse = $this->get(route('products.index', ['sort' => 'brand_desc']));
         $sortDescResponse->assertStatus(200);
+    }
+
+    public function test_product_image_url_attribute_resolves_when_file_exists(): void
+    {
+        Storage::fake('public');
+
+        $file = $this->createFakePng('test_cam.png', 100);
+        $path = $file->store('products', 'public');
+
+        $product = Product::create([
+            'sku' => 'CAM-TEST-IMG-URL',
+            'name' => 'Camera Image URL Test',
+            'category' => 'Industrial Cameras',
+            'image_path' => $path,
+        ]);
+
+        $this->assertNotNull($product->image_url);
+        $this->assertStringContainsString('storage/'.$path, $product->image_url);
+        $this->assertStringNotContainsString(':8000', $product->image_url);
+
+        // View renders the image tag with resolved image URL
+        $response = $this->get(route('products.index'));
+        $response->assertStatus(200);
+        $response->assertSee($product->image_url, false);
+    }
+
+    public function test_product_image_url_returns_null_when_file_missing_or_not_set(): void
+    {
+        Storage::fake('public');
+
+        $noImgProduct = Product::create([
+            'sku' => 'CAM-NO-IMG-TEST',
+            'name' => 'No Image Camera',
+            'category' => 'Industrial Cameras',
+            'image_path' => null,
+        ]);
+
+        $missingFileProduct = Product::create([
+            'sku' => 'CAM-MISSING-IMG-TEST',
+            'name' => 'Missing File Camera',
+            'category' => 'Industrial Cameras',
+            'image_path' => 'products/non_existent.jpg',
+        ]);
+
+        $this->assertNull($noImgProduct->image_url);
+        $this->assertNull($missingFileProduct->image_url);
     }
 }

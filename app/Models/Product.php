@@ -48,8 +48,14 @@ class Product extends Model
      */
     public function getImageUrlAttribute(): ?string
     {
-        if ($this->image_path && Storage::disk('public')->exists($this->image_path)) {
-            return Storage::disk('public')->url($this->image_path);
+        if (! $this->image_path) {
+            return null;
+        }
+
+        $cleanPath = str_replace('\\', '/', $this->image_path);
+
+        if (Storage::disk('public')->exists($cleanPath)) {
+            return asset('storage/'.ltrim($cleanPath, '/'));
         }
 
         return null;
