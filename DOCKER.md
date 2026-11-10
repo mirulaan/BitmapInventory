@@ -20,7 +20,7 @@ The container setup uses a high-performance **multi-stage build**:
 
 ## 1. Quick Start with Docker Compose
 
-The easiest way to run the full stack (Laravel application, MySQL 8.0, Redis, Queue Worker, and Scheduler) is with Docker Compose:
+The easiest way to run the stack (Laravel application connected to PostgreSQL, Redis, Queue Worker, and Scheduler) is with Docker Compose:
 
 ### Step 1: Prepare Environment File
 Copy the Docker-specific environment template:
@@ -54,12 +54,11 @@ Healthcheck endpoint:
 
 ## 2. Docker Compose Services
 
-The `docker-compose.yml` file configures five services:
+The `docker-compose.yml` file configures the core services connecting to your PostgreSQL database (`192.168.100.4:5432`):
 
 | Service | Container Name | Description | Port |
 | :--- | :--- | :--- | :--- |
 | `app` | `bitmap_inventory_app` | Web application (Nginx + PHP-FPM + Supervisor) | `8000:80` |
-| `db` | `bitmap_inventory_db` | MySQL 8.0 database | `3306:3306` |
 | `redis` | `bitmap_inventory_redis` | Redis 7 in-memory cache, session, and queue driver | `6379:6379` |
 | `queue` | `bitmap_inventory_queue` | Laravel background queue worker (`artisan queue:work`) | Internal |
 | `scheduler` | `bitmap_inventory_scheduler` | Laravel task scheduler (`artisan schedule:work`) | Internal |
@@ -114,12 +113,12 @@ docker run -d \
   -e APP_NAME=BitmapInventory \
   -e APP_ENV=production \
   -e APP_KEY=base64:YOUR_GENERATED_APP_KEY \
-  -e DB_CONNECTION=mysql \
-  -e DB_HOST=your-managed-db-host \
-  -e DB_PORT=3306 \
-  -e DB_DATABASE=bitmap_inventory \
-  -e DB_USERNAME=db_user \
-  -e DB_PASSWORD=db_password \
+  -e DB_CONNECTION=pgsql \
+  -e DB_HOST=192.168.100.4 \
+  -e DB_PORT=5432 \
+  -e DB_DATABASE=mydb \
+  -e DB_USERNAME=postgres \
+  -e DB_PASSWORD=Abitabit9898 \
   -e RUN_MIGRATIONS=true \
   your-registry/bitmap-inventory:latest
 ```

@@ -81,7 +81,7 @@ When running the database seeders, the following pre-configured accounts are cre
 
 ## Quick Start (Docker Deployment)
 
-BitmapInventory is fully containerized and production-ready with Docker Compose (includes Nginx, PHP 8.4-FPM, MySQL 8, Redis, Supervisor, Queue Worker, and Scheduler):
+BitmapInventory is fully containerized and production-ready with Docker Compose (includes Nginx, PHP 8.4-FPM, PostgreSQL connectivity, Redis, Supervisor, Queue Worker, and Scheduler):
 
 ```bash
 # 1. Clone the repository
@@ -106,7 +106,7 @@ For full Docker configuration details, cloud deployments (AWS, Cloud Run, VPS), 
 ## Local Development Setup (Without Docker)
 
 ### Prerequisites
-- **PHP** >= 8.4 with extensions (`pdo_sqlite` or `pdo_mysql`, `curl`, `mbstring`, `intl`, `gd`, `bcmath`, `zip`)
+- **PHP** >= 8.4 with extensions (`pdo_pgsql`, `pdo_sqlite`, `curl`, `mbstring`, `intl`, `gd`, `bcmath`, `zip`)
 - **Composer** >= 2.x
 - **Node.js** >= 20.x & **npm**
 
@@ -155,7 +155,7 @@ All 76 tests run against an in-memory SQLite database and execute in seconds.
 
 - **Backend Framework**: [Laravel 13](https://laravel.com) (PHP 8.4+)
 - **Frontend / UI**: Laravel Blade Components & [Tailwind CSS v4](https://tailwindcss.com) compiled with [Vite](https://vite.dev)
-- **Database**: SQLite (default local) / MySQL 8.0 (Docker & Production)
+- **Database**: PostgreSQL (`pgsql`) / SQLite (test suite & dev)
 - **Cache & Session & Queue**: Redis / In-memory / Database
 - **Process Supervisor**: Supervisord & PHP-FPM
 - **Web Server**: Nginx Alpine
