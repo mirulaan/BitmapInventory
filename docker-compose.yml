@@ -1,0 +1,157 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bitmap-inventory:latest
+    container_name: bitmap_inventory_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:80"
+    environment:
+      APP_NAME: "${APP_NAME:-BitmapInventory}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      APP_URL: "${APP_URL:-http://localhost:8000}"
+      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
+      DB_USERNAME: "${DB_USERNAME:-bitmap_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-bitmap_secret}"
+      SESSION_DRIVER: "${SESSION_DRIVER:-redis}"
+      SESSION_LIFETIME: 120
+      CACHE_STORE: "${CACHE_STORE:-redis}"
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-redis}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-true}"
+      SEED_DATABASE: "${SEED_DATABASE:-false}"
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bitmap_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/up"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  queue:
+    image: bitmap-inventory:latest
+    container_name: bitmap_inventory_queue
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90"]
+    environment:
+      APP_NAME: "${APP_NAME:-BitmapInventory}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
+      DB_USERNAME: "${DB_USERNAME:-bitmap_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-bitmap_secret}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      QUEUE_CONNECTION: "${QUEUE_CONNECTION:-redis}"
+      CACHE_STORE: "${CACHE_STORE:-redis}"
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bitmap_network
+
+  scheduler:
+    image: bitmap-inventory:latest
+    container_name: bitmap_inventory_scheduler
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    environment:
+      APP_NAME: "${APP_NAME:-BitmapInventory}"
+      APP_ENV: "${APP_ENV:-production}"
+      APP_KEY: "${APP_KEY:-}"
+      APP_DEBUG: "${APP_DEBUG:-false}"
+      DB_CONNECTION: "${DB_CONNECTION:-mysql}"
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
+      DB_USERNAME: "${DB_USERNAME:-bitmap_user}"
+      DB_PASSWORD: "${DB_PASSWORD:-bitmap_secret}"
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_STORE: "${CACHE_STORE:-redis}"
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
+    networks:
+      - bitmap_network
+
+  db:
+    image: mysql:8.0
+    container_name: bitmap_inventory_db
+    restart: unless-stopped
+    ports:
+      - "${FORWARD_DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
+      MYSQL_USER: "${DB_USERNAME:-bitmap_user}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:-bitmap_secret}"
+      MYSQL_ROOT_PASSWORD: "${DB_PASSWORD:-bitmap_secret}"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - bitmap_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: bitmap_inventory_redis
+    restart: unless-stopped
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bitmap_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  db_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_storage:
+    driver: local
+
+networks:
+  bitmap_network:
+    driver: bridge

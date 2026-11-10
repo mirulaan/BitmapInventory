@@ -1,0 +1,62 @@
+# Version Control
+.git
+.gitignore
+.gitattributes
+
+# IDE & Editor files
+.idea
+.vscode
+.zed
+.nova
+.cursor
+.codex
+.editorconfig
+
+# Agent / Tooling metadata
+.agents
+.claude
+AGENTS.md
+CLAUDE.md
+boost.json
+.mcp.json
+
+# Local dependencies & caches
+node_modules
+vendor
+npm-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.docker.example
+
+# Test & coverage artifacts
+tests
+phpunit.xml
+.phpunit.cache
+.phpunit.result.cache
+
+# Application storage caches & logs
+storage/*.key
+storage/pail
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+!storage/framework/cache/.gitignore
+!storage/framework/sessions/.gitignore
+!storage/framework/views/.gitignore
+!storage/logs/.gitignore
+
+# SQLite databases
+database/*.sqlite
+database/*.sqlite-journal
+
+# Documentation files
+README.md
+DOCKER.md
+
+# Docker-related files not needed in final app image
+docker-compose*.yml

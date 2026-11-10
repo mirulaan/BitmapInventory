@@ -1,0 +1,31 @@
+# Development override compose file:
+# Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  app:
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      RUN_MIGRATIONS: "true"
+      SKIP_OPTIMIZATION: "true"
+    volumes:
+      - .:/var/www/html
+      - app_storage:/var/www/html/storage
+    ports:
+      - "${APP_PORT:-8000}:80"
+      - "5173:5173"
+
+  queue:
+    volumes:
+      - .:/var/www/html
+      - app_storage:/var/www/html/storage
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+
+  scheduler:
+    volumes:
+      - .:/var/www/html
+      - app_storage:/var/www/html/storage
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"

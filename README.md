@@ -21,6 +21,22 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Docker Deployment
+
+BitmapInventory is fully containerized and ready for production deployment:
+
+```bash
+# 1. Copy docker environment configuration
+cp .env.docker.example .env
+
+# 2. Start services (App, MySQL 8, Redis, Queue worker, Scheduler)
+docker compose up -d --build
+```
+
+Access the application at [http://localhost:8000](http://localhost:8000) (Health check: `/up`).
+
+For complete deployment details, standalone container setup, and production configurations, see [DOCKER.md](DOCKER.md).
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
