@@ -1,74 +1,168 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# BitmapInventory
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <strong>Enterprise Hardware Lifecycle, Vision Equipment & Asset Inventory Management System</strong>
 </p>
 
-## About Laravel
+<p align="center">
+  <img src="https://img.shields.io/badge/Laravel-13.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 13" />
+  <img src="https://img.shields.io/badge/PHP-8.4%2B-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.4+" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS v4" />
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Ready" />
+  <img src="https://img.shields.io/badge/Tests-76%20Passed-brightgreen?style=for-the-badge" alt="Tests" />
+</p>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Overview
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+**BitmapInventory** is an end-to-end asset and inventory management application designed specifically for industrial vision systems, cameras, IPCs, networking hardware, and serialized enterprise equipment. 
 
-## Docker Deployment
+It covers complete hardware lifecycles—from procurement and warehouse receiving to field loan dispatching, client-site deployments, RMA repairs, cycle count reconciliation, and financial cost accounting.
 
-BitmapInventory is fully containerized and ready for production deployment:
+---
+
+## Key Features & Functional Modules
+
+### 1. Hardware Lifecycle & Workflow Engine
+- **Stock-In & Serial Tracking**: Receive items with individual serial numbers, batch numbers, and purchase costs.
+- **Rack-to-Rack Transfers**: Move assets between internal warehouses, branches, floors, and specific racks.
+- **Client Loan Operations**: Dispatch equipment on loan to client sites with loan agreements, person-in-charge tracking, and return due dates.
+- **Early Warnings & Overdue Alerts**:
+  - 🟠 *Expiring Loan Warning*: Visual badges for loans due within 7 days.
+  - 🔴 *Overdue Alert*: Prominent alerts and indicators for overdue hardware.
+- **Convert to Sale**: Seamlessly transition items on loan into permanent client sales with customer & supplier PO references.
+- **Direct Sales**: Sell warehouse items directly to clients.
+- **Reservations**: Hold hardware for upcoming engineering projects and release when completed.
+- **RMA & Defective Repair**: Track hardware sent to suppliers for RMA repair and handle returns.
+- **Decommissioning**: Safely scrap obsolete or end-of-life hardware with audit logs.
+
+### 2. Procurement & Purchase Orders
+- **Purchase Order Management**: Create and track POs through status lifecycles (`Draft` → `Approved` → `Ordered` → `Received` → `Cancelled`).
+- **Auto-Draft from Low Stock**: Automatically draft new POs when catalog items fall below minimum stock thresholds.
+- **Receiving Workflow**: Convert ordered PO items directly into active serialized inventory items upon physical delivery.
+
+### 3. Cycle Counts & Physical Stock Audits
+- **Barcode & Serial Scanning**: Perform physical warehouse counts by scanning serial numbers against registered stock.
+- **Discrepancy Calculation**: Automatically compute expected vs. counted variance.
+- **Reconciliation**: Finalize audits and adjust inventory state with an immutable audit ledger.
+
+### 4. Financial Valuation & Cost Accounting
+- **Inventory Valuation Models**: Supports **FIFO** (First-In, First-Out), **LIFO** (Last-In, First-Out), and **Weighted Average** costing methods.
+- **COGS (Cost of Goods Sold)**: Real-time calculation of inventory value and sold goods expense.
+- **CSV Data Export**: Export valuation reports for finance and accounting audits.
+
+### 5. Audit Trail & Ledger
+- **Complete Traceability**: Every transaction logs timestamps, user responsible, transaction type, source/destination locations, serial number, and reference documentation numbers.
+- **Advanced Filtering**: Filter by transaction type, search by model/brand/form number, and export filtered logs to CSV.
+
+### 6. Role-Based Access Control (RBAC)
+| Role | Identifier | Key Capabilities |
+| :--- | :--- | :--- |
+| **Super Admin** | `admin` | Full system access, user management, and superadmin password reset codes. |
+| **Warehouse Manager** | `warehouse` | Stock In, transfers, decommissioning, PO creation/receiving, stock counts, catalog management. |
+| **Field Engineer** | `engineer` | Loan dispatches, loan returns, sale conversions, direct sales, reservations, RMA. |
+| **Auditor / Viewer** | `viewer` | Read-only access to dashboard, inventory, valuation, reports, and audit trail. |
+
+---
+
+## Default Demo Credentials
+
+When running the database seeders, the following pre-configured accounts are created:
+
+| Role | Username | Email | Password |
+| :--- | :--- | :--- | :--- |
+| **Super Admin** | `admin` | `admin@bitmap.com` | `password` |
+| **Warehouse Manager** | `warehouse` | `warehouse@bitmap.com` | `password` |
+| **Field Engineer** | `engineer` | `engineer@bitmap.com` | `password` |
+| **Auditor / Viewer** | `viewer` | `viewer@bitmap.com` | `password` |
+
+---
+
+## Quick Start (Docker Deployment)
+
+BitmapInventory is fully containerized and production-ready with Docker Compose (includes Nginx, PHP 8.4-FPM, MySQL 8, Redis, Supervisor, Queue Worker, and Scheduler):
 
 ```bash
-# 1. Copy docker environment configuration
+# 1. Clone the repository
+git clone https://github.com/mirulaan/BitmapInventory.git
+cd BitmapInventory
+
+# 2. Copy the Docker environment configuration
 cp .env.docker.example .env
 
-# 2. Start services (App, MySQL 8, Redis, Queue worker, Scheduler)
+# 3. Build and launch all services in detached mode
 docker compose up -d --build
 ```
 
-Access the application at [http://localhost:8000](http://localhost:8000) (Health check: `/up`).
+The application is now accessible at:
+- **Web Application**: [http://localhost:8000](http://localhost:8000)
+- **Health Check**: [http://localhost:8000/up](http://localhost:8000/up)
 
-For complete deployment details, standalone container setup, and production configurations, see [DOCKER.md](DOCKER.md).
+For full Docker configuration details, cloud deployments (AWS, Cloud Run, VPS), and development mounts, see [DOCKER.md](DOCKER.md).
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Local Development Setup (Without Docker)
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Prerequisites
+- **PHP** >= 8.4 with extensions (`pdo_sqlite` or `pdo_mysql`, `curl`, `mbstring`, `intl`, `gd`, `bcmath`, `zip`)
+- **Composer** >= 2.x
+- **Node.js** >= 20.x & **npm**
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+### Step-by-Step Installation
 
 ```bash
-composer require laravel/boost --dev
+# 1. Install PHP dependencies
+composer install
 
-php artisan boost:install
+# 2. Setup environment file & encryption key
+cp .env.example .env
+php artisan key:generate
+
+# 3. Run database migrations & seed demo scenarios
+php artisan migrate --seed
+
+# 4. Install npm packages and build frontend assets
+npm install
+npm run build
+
+# 5. Start the local development server
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Run Vite for live front-end hot module reloading:
+```bash
+npm run dev
+```
 
-## Contributing
+---
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Running Automated Tests
 
-## Code of Conduct
+BitmapInventory includes a comprehensive test suite covering authentication, RBAC authorization, inventory workflows, PO procurement, cycle counts, valuation, and catalog settings:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+# Run all PHPUnit tests
+php artisan test
+```
 
-## Security Vulnerabilities
+All 76 tests run against an in-memory SQLite database and execute in seconds.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
+
+## Tech Stack & Architecture
+
+- **Backend Framework**: [Laravel 13](https://laravel.com) (PHP 8.4+)
+- **Frontend / UI**: Laravel Blade Components & [Tailwind CSS v4](https://tailwindcss.com) compiled with [Vite](https://vite.dev)
+- **Database**: SQLite (default local) / MySQL 8.0 (Docker & Production)
+- **Cache & Session & Queue**: Redis / In-memory / Database
+- **Process Supervisor**: Supervisord & PHP-FPM
+- **Web Server**: Nginx Alpine
+- **Containerization**: Multi-stage Dockerfile & Docker Compose
+
+---
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project is open-sourced software licensed under the [MIT license](LICENSE).
