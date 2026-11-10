@@ -33,8 +33,9 @@ if [ -n "$PORT" ] && [ "$PORT" != "80" ]; then
     sed -i "s/listen \[::\]:80 default_server;/listen [::]:${PORT} default_server;/g" /etc/nginx/http.d/default.conf
 fi
 
-# Auto-generate APP_KEY if missing in non-production environments
-if [ -z "$APP_KEY" ] && [ "${APP_ENV:-production}" != "production" ]; then
+# Auto-generate APP_KEY if missing
+if [ -z "$APP_KEY" ]; then
+    echo "Notice: APP_KEY not set. Auto-generating application key..."
     php artisan key:generate --no-interaction --force || true
 fi
 
