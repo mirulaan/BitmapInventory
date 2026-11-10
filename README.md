@@ -20,6 +20,8 @@
 
 It covers complete hardware lifecycles—from procurement and warehouse receiving to field loan dispatching, client-site deployments, RMA repairs, cycle count reconciliation, and financial cost accounting.
 
+> 📖 **User Manual**: For an in-depth operational walkthrough covering every role, workflow, and action, see the **[Operations Guide & User Manual](GUIDE.md)**.
+
 ---
 
 ## Key Features & Functional Modules
