@@ -17,7 +17,7 @@ services:
       DB_CONNECTION: "${DB_CONNECTION:-pgsql}"
       DB_HOST: "${DB_HOST:-192.168.100.4}"
       DB_PORT: "${DB_PORT:-5432}"
-      DB_DATABASE: "${DB_DATABASE:-db_BitmapInventory}"
+      DB_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
       DB_USERNAME: "${DB_USERNAME:-postgres}"
       DB_PASSWORD: "${DB_PASSWORD:-Abitabit9898}"
       SESSION_DRIVER: "${SESSION_DRIVER:-redis}"
@@ -55,7 +55,7 @@ services:
       DB_CONNECTION: "${DB_CONNECTION:-pgsql}"
       DB_HOST: "${DB_HOST:-192.168.100.4}"
       DB_PORT: "${DB_PORT:-5432}"
-      DB_DATABASE: "${DB_DATABASE:-db_BitmapInventory}"
+      DB_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
       DB_USERNAME: "${DB_USERNAME:-postgres}"
       DB_PASSWORD: "${DB_PASSWORD:-Abitabit9898}"
       REDIS_HOST: redis
@@ -87,7 +87,7 @@ services:
       DB_CONNECTION: "${DB_CONNECTION:-pgsql}"
       DB_HOST: "${DB_HOST:-192.168.100.4}"
       DB_PORT: "${DB_PORT:-5432}"
-      DB_DATABASE: "${DB_DATABASE:-db_BitmapInventory}"
+      DB_DATABASE: "${DB_DATABASE:-bitmap_inventory}"
       DB_USERNAME: "${DB_USERNAME:-postgres}"
       DB_PASSWORD: "${DB_PASSWORD:-Abitabit9898}"
       REDIS_HOST: redis

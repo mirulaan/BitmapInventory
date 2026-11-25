@@ -116,7 +116,7 @@ docker run -d \
   -e DB_CONNECTION=pgsql \
   -e DB_HOST=192.168.100.4 \
   -e DB_PORT=5432 \
-  -e DB_DATABASE=db_BitmapInventory \
+  -e DB_DATABASE=bitmap_inventory \
   -e DB_USERNAME=postgres \
   -e DB_PASSWORD=Abitabit9898 \
   -e RUN_MIGRATIONS=true \
