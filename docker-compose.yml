@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: bitmap-inventory:latest
+    pull_policy: build
     container_name: bitmap_inventory_app
     restart: unless-stopped
     ports:
@@ -43,7 +44,11 @@ services:
       start_period: 20s
 
   queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: bitmap-inventory:latest
+    pull_policy: build
     container_name: bitmap_inventory_queue
     restart: unless-stopped
     command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90"]
@@ -75,7 +80,11 @@ services:
       - bitmap_network
 
   scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: bitmap-inventory:latest
+    pull_policy: build
     container_name: bitmap_inventory_scheduler
     restart: unless-stopped
     command: ["php", "artisan", "schedule:work"]
