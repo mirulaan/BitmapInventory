@@ -203,7 +203,7 @@ docker run -d \
   -e DB_CONNECTION=pgsql \
   -e DB_HOST=192.168.100.4 \
   -e DB_PORT=5432 \
-  -e DB_DATABASE=mydb \
+  -e DB_DATABASE=db_BitmapInventory \
   -e DB_USERNAME=postgres \
   -e DB_PASSWORD=your_password \
   -e RUN_MIGRATIONS=true \
@@ -242,6 +242,10 @@ The container image is engineered for cloud platforms that inject a `$PORT` envi
   - Build directly from Dockerfile; port forwarding dynamically adapts.
 - **Coolify / CapRover / Portainer:**
   - Import the repository and select the `docker-compose.yml` file.
+  - In **Portainer** (**Stacks** → **+ Add stack** → **Repository**):
+    1. Set **Repository URL** to `https://github.com/mirulaan/BitmapInventory.git`, **Repository reference** to `refs/heads/main`, and **Compose path** to `docker-compose.yml`.
+    2. Add your environment variables (`APP_KEY`, `APP_PORT=8626`, `APP_URL=http://<server-ip>:8626`, `DB_HOST`, `DB_DATABASE=db_BitmapInventory`, `DB_USERNAME`, `DB_PASSWORD`, `RUN_MIGRATIONS=true`).
+    3. Click **Deploy the stack** and access the app on port `8626`.
 
 ---
 
@@ -273,7 +277,7 @@ Features in development mode:
 | `DB_CONNECTION` | `pgsql` | Database driver (`pgsql`, `sqlite`, `mysql`) |
 | `DB_HOST` | `192.168.100.4` | Database server address |
 | `DB_PORT` | `5432` | Database server port |
-| `DB_DATABASE` | `mydb` | Database name |
+| `DB_DATABASE` | `db_BitmapInventory` | Database name |
 | `DB_USERNAME` | `postgres` | Database username |
 | `DB_PASSWORD` | `Abitabit9898` | Database user password |
 | `REDIS_HOST` | `redis` | Redis hostname or IP |
@@ -343,7 +347,7 @@ docker compose down -v
 - Verify host authentication permissions in `pg_hba.conf` allow connections from the Docker subnet (`172.x.x.x`).
 - Test database connectivity from inside the container:
   ```bash
-  docker compose exec app php -r "new PDO('pgsql:host=192.168.100.4;port=5432;dbname=mydb', 'postgres', 'Abitabit9898'); echo 'Connected successfully';"
+  docker compose exec app php -r "new PDO('pgsql:host=192.168.100.4;port=5432;dbname=db_BitmapInventory', 'postgres', 'Abitabit9898'); echo 'Connected successfully';"
   ```
 
 ### Q3: Storage or Cache Permission Errors
