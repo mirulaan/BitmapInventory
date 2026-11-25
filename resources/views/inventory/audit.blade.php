@@ -101,8 +101,10 @@
                         <option value="stock_in" {{ request('transaction_type') == 'stock_in' ? 'selected' : '' }}>Stock In</option>
                         <option value="dispatch_loan" {{ request('transaction_type') == 'dispatch_loan' ? 'selected' : '' }}>Loan Out</option>
                         <option value="return_loan" {{ request('transaction_type') == 'return_loan' ? 'selected' : '' }}>Loan Returned</option>
+                        <option value="extend_loan" {{ request('transaction_type') == 'extend_loan' ? 'selected' : '' }}>Loan Extended</option>
                         <option value="convert_to_sale" {{ request('transaction_type') == 'convert_to_sale' ? 'selected' : '' }}>Loan to Sale</option>
                         <option value="direct_sale" {{ request('transaction_type') == 'direct_sale' ? 'selected' : '' }}>Direct Sale</option>
+                        <option value="bulk_out" {{ request('transaction_type') == 'bulk_out' ? 'selected' : '' }}>Project Out (Bulk)</option>
                     </select>
                 </div>
 
@@ -172,8 +174,10 @@
                                     'stock_in'        => ['bg' => 'bg-blue-50 text-blue-700 border-blue-200/80', 'dot' => 'bg-blue-500', 'label' => 'Stock In'],
                                     'dispatch_loan'   => ['bg' => 'bg-amber-50 text-amber-700 border-amber-200/80', 'dot' => 'bg-amber-500', 'label' => 'Loan Out'],
                                     'return_loan'     => ['bg' => 'bg-teal-50 text-teal-700 border-teal-200/80', 'dot' => 'bg-teal-500', 'label' => 'Loan Returned'],
+                                    'extend_loan'     => ['bg' => 'bg-sky-50 text-sky-700 border-sky-200/80', 'dot' => 'bg-sky-500', 'label' => 'Loan Extended'],
                                     'convert_to_sale' => ['bg' => 'bg-purple-50 text-purple-700 border-purple-200/80', 'dot' => 'bg-purple-500', 'label' => 'Loan to Sale'],
                                     'direct_sale'     => ['bg' => 'bg-emerald-50 text-emerald-700 border-emerald-200/80', 'dot' => 'bg-emerald-500', 'label' => 'Direct Sale'],
+                                    'bulk_out'        => ['bg' => 'bg-violet-50 text-violet-700 border-violet-200/80', 'dot' => 'bg-violet-500', 'label' => 'Project Out'],
                                     default           => ['bg' => 'bg-slate-50 text-slate-700 border-slate-200/80', 'dot' => 'bg-slate-400', 'label' => ucwords(str_replace('_', ' ', $log->transaction_type))],
                                 };
                             @endphp

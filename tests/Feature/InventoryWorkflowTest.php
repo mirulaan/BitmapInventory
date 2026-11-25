@@ -18,9 +18,13 @@ class InventoryWorkflowTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Product $product;
+
     private Location $warehouse;
+
     private Location $clientSite;
+
     private Client $client;
 
     protected function setUp(): void
@@ -313,7 +317,7 @@ class InventoryWorkflowTest extends TestCase
         $page->assertSee('<option value="Camera" selected>', false);
 
         // Verify Product remains selected
-        $page->assertSee('<option value="' . $this->product->id . '" selected', false);
+        $page->assertSee('<option value="'.$this->product->id.'" selected', false);
 
         // Verify Serial Numbers and quantity are preserved
         $page->assertSee('SN-RETAIN-001');
@@ -340,12 +344,254 @@ class InventoryWorkflowTest extends TestCase
         $page->assertSee('<option value="Camera" selected>', false);
 
         // Product remains selected
-        $page->assertSee('<option value="' . $this->product->id . '" selected', false);
+        $page->assertSee('<option value="'.$this->product->id.'" selected', false);
 
         // Location remains selected
-        $page->assertSee('<option value="' . $this->warehouse->id . '" selected', false);
+        $page->assertSee('<option value="'.$this->warehouse->id.'" selected', false);
 
         // Duplicate serial preserved in table for user to fix
         $page->assertSee('SN-DUP-01');
+    }
+
+    public function test_dashboard_displays_clickable_loan_status_and_extend_button(): void
+    {
+        $item = InventoryItem::create([
+            'product_id' => $this->product->id,
+            'serial_number' => 'SN-DASH-LOAN-01',
+            'quantity' => 1,
+            'location_id' => $this->clientSite->id,
+            'client_id' => $this->client->id,
+            'status' => 'on_loan',
+        ]);
+
+        InventoryTransaction::create([
+            'inventory_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'transaction_type' => 'dispatch_loan',
+            'from_location_id' => $this->warehouse->id,
+            'to_location_id' => $this->clientSite->id,
+            'from_status' => 'in_stock',
+            'to_status' => 'on_loan',
+            'quantity' => 1,
+            'person_in_charge' => 'Alice',
+            'loan_form_no' => 'LF-DASH-01',
+            'loan_start_date' => Carbon::now()->subDays(5)->toDateString(),
+            'loan_end_date' => Carbon::now()->addDays(10)->toDateString(),
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertStatus(200);
+        $response->assertSee('SN-DASH-LOAN-01');
+        $response->assertSee('openLoanModal(this, \'status\')', false);
+        $response->assertSee('openLoanModal(this, \'extend\')', false);
+        $response->assertSee('openLoanModal(this, \'return\')', false);
+        $response->assertSee('openLoanModal(this, \'convert\')', false);
+        $response->assertSee('loan-manage-modal');
+    }
+
+    public function test_user_can_extend_active_loan_from_dashboard(): void
+    {
+        $item = InventoryItem::create([
+            'product_id' => $this->product->id,
+            'serial_number' => 'SN-EXT-01',
+            'quantity' => 1,
+            'location_id' => $this->clientSite->id,
+            'client_id' => $this->client->id,
+            'status' => 'on_loan',
+        ]);
+
+        $loanTx = InventoryTransaction::create([
+            'inventory_item_id' => $item->id,
+            'user_id' => $this->user->id,
+            'transaction_type' => 'dispatch_loan',
+            'from_location_id' => $this->warehouse->id,
+            'to_location_id' => $this->clientSite->id,
+            'from_status' => 'in_stock',
+            'to_status' => 'on_loan',
+            'quantity' => 1,
+            'person_in_charge' => 'Bob',
+            'loan_form_no' => 'LF-EXT-01',
+            'loan_start_date' => Carbon::now()->subDays(10)->toDateString(),
+            'loan_end_date' => Carbon::now()->subDay()->toDateString(),
+        ]);
+
+        $newEndDate = Carbon::now()->addDays(21)->toDateString();
+
+        $response = $this->from(route('dashboard'))
+            ->post(route('inventory.process_extend_loan', $item->id), [
+                'new_end_date' => $newEndDate,
+                'notes' => 'Client requested 3-week PoC extension',
+            ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHas('success');
+
+        $loanTx->refresh();
+        $this->assertEquals($newEndDate, Carbon::parse($loanTx->loan_end_date)->toDateString());
+
+        $this->assertDatabaseHas('inventory_transactions', [
+            'inventory_item_id' => $item->id,
+            'transaction_type' => 'extend_loan',
+            'from_status' => 'on_loan',
+            'to_status' => 'on_loan',
+            'loan_form_no' => 'LF-EXT-01',
+        ]);
+    }
+
+    public function test_extend_loan_rejects_past_due_date(): void
+    {
+        $item = InventoryItem::create([
+            'product_id' => $this->product->id,
+            'serial_number' => 'SN-EXT-PAST',
+            'quantity' => 1,
+            'location_id' => $this->clientSite->id,
+            'client_id' => $this->client->id,
+            'status' => 'on_loan',
+        ]);
+
+        $response = $this->from(route('dashboard'))
+            ->post(route('inventory.process_extend_loan', $item->id), [
+                'new_end_date' => Carbon::now()->subDays(2)->toDateString(),
+            ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHasErrors('new_end_date');
+    }
+
+    public function test_user_can_modify_loan_status_from_dashboard(): void
+    {
+        $returnItem = InventoryItem::create([
+            'product_id' => $this->product->id,
+            'serial_number' => 'SN-MOD-RET',
+            'quantity' => 1,
+            'location_id' => $this->clientSite->id,
+            'client_id' => $this->client->id,
+            'status' => 'on_loan',
+        ]);
+
+        $response = $this->from(route('dashboard'))
+            ->post(route('inventory.process_loan_status', $returnItem->id), [
+                'target_status' => 'in_stock',
+                'location_id' => $this->warehouse->id,
+                'notes' => 'Returned via dashboard modal',
+            ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $response->assertSessionHas('success');
+
+        $returnItem->refresh();
+        $this->assertEquals('in_stock', $returnItem->status);
+        $this->assertEquals($this->warehouse->id, $returnItem->location_id);
+        $this->assertNull($returnItem->client_id);
+
+        $this->assertDatabaseHas('inventory_transactions', [
+            'inventory_item_id' => $returnItem->id,
+            'transaction_type' => 'return_loan',
+            'from_status' => 'on_loan',
+            'to_status' => 'in_stock',
+        ]);
+
+        $rmaItem = InventoryItem::create([
+            'product_id' => $this->product->id,
+            'serial_number' => 'SN-MOD-RMA',
+            'quantity' => 1,
+            'location_id' => $this->clientSite->id,
+            'client_id' => $this->client->id,
+            'status' => 'on_loan',
+        ]);
+
+        $rmaResponse = $this->from(route('dashboard'))
+            ->post(route('inventory.process_loan_status', $rmaItem->id), [
+                'target_status' => 'rma_defective',
+                'rma_ticket_no' => 'RMA-2026-777',
+                'vendor_name' => 'Basler Support',
+                'person_in_charge' => 'Charlie Tech',
+                'issue_description' => 'Sensor fault during PoC',
+            ]);
+
+        $rmaResponse->assertRedirect(route('dashboard'));
+        $rmaResponse->assertSessionHas('success');
+
+        $rmaItem->refresh();
+        $this->assertEquals('rma_defective', $rmaItem->status);
+        $this->assertDatabaseHas('inventory_transactions', [
+            'inventory_item_id' => $rmaItem->id,
+            'transaction_type' => 'send_rma',
+            'from_status' => 'on_loan',
+            'to_status' => 'rma_defective',
+            'reference_number' => 'RMA-2026-777',
+        ]);
+    }
+
+    public function test_user_can_receive_and_issue_bulk_in_house_consumables_for_projects(): void
+    {
+        $bulkProduct = Product::create([
+            'sku' => 'SCR-M4-001',
+            'name' => 'M4 Stainless Screw',
+            'category' => 'Camera',
+            'tracking_type' => 'bulk',
+            'unit_price' => 0.50,
+        ]);
+
+        // Receive 100 units without serial numbers
+        $receive1 = $this->post(route('inventory.store'), [
+            'product_id' => $bulkProduct->id,
+            'location_id' => $this->warehouse->id,
+            'quantity' => 100,
+            'notes' => 'Initial box of 100 screws',
+        ]);
+
+        $receive1->assertRedirect(route('inventory.product', $bulkProduct->id));
+
+        // Receive 50 more at the same rack -> should increment existing row to 150
+        $this->post(route('inventory.store'), [
+            'product_id' => $bulkProduct->id,
+            'location_id' => $this->warehouse->id,
+            'quantity' => 50,
+        ]);
+
+        $bulkItem = InventoryItem::where('product_id', $bulkProduct->id)->first();
+        $this->assertNotNull($bulkItem);
+        $this->assertNull($bulkItem->serial_number);
+        $this->assertEquals(150, $bulkItem->quantity);
+
+        // Product view shows Issue to Project (Out) and hides Loan Out / Sell / Transfer
+        $productPage = $this->get(route('inventory.product', $bulkProduct->id));
+        $productPage->assertStatus(200);
+        $productPage->assertSee('Issue to Project (Out)');
+        $productPage->assertDontSee('Loan Out');
+
+        // Cannot issue more than available stock
+        $overIssue = $this->from(route('inventory.product', $bulkProduct->id))
+            ->post(route('inventory.process_issue_bulk', $bulkItem->id), [
+                'quantity' => 200,
+                'project_name' => 'Line 3 Retrofit',
+                'person_in_charge' => 'Technician A',
+            ]);
+        $overIssue->assertSessionHasErrors('quantity');
+
+        // Issue 25 units to a project
+        $issueResponse = $this->post(route('inventory.process_issue_bulk', $bulkItem->id), [
+            'quantity' => 25,
+            'project_name' => 'Line 3 Retrofit',
+            'person_in_charge' => 'Technician A',
+            'notes' => 'Used for bracket assembly',
+        ]);
+
+        $issueResponse->assertRedirect(route('inventory.product', $bulkProduct->id));
+        $bulkItem->refresh();
+        $this->assertEquals(125, $bulkItem->quantity);
+
+        $this->assertDatabaseHas('inventory_transactions', [
+            'inventory_item_id' => $bulkItem->id,
+            'transaction_type' => 'bulk_out',
+            'from_location_id' => $this->warehouse->id,
+            'from_status' => 'in_stock',
+            'to_status' => 'in_house_used',
+            'quantity' => 25,
+            'reference_number' => 'Line 3 Retrofit',
+            'person_in_charge' => 'Technician A',
+        ]);
     }
 }

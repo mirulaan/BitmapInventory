@@ -100,8 +100,8 @@
                     </div>
                 </div>
 
-                <!-- BOTTOM SECTION: Batch Add Serial Numbers -->
-                <div>
+                <!-- BOTTOM SECTION: Batch Add Serial Numbers (Serialized) -->
+                <div id="serialized_section">
                     <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-4">Batch Add Serial Numbers</h3>
 
                     <!-- Input and Quantity Row -->
@@ -159,6 +159,30 @@
                         </table>
                     </div>
 
+                </div>
+
+                <!-- BOTTOM SECTION: Bulk In-House Quantity (Non-Serialized) -->
+                <div id="bulk_section" class="hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-500">Bulk In-House Quantity</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Non-serialized consumable (screws, nuts, cables) — tracked by quantity for in-house project use.</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-md bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/20">
+                            Bulk Mode
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50/70 p-5 rounded-xl border border-slate-200/80">
+                        <div>
+                            <label for="bulk_quantity" class="block text-sm font-medium leading-6 text-gray-900">Quantity Received <span class="text-red-500">*</span></label>
+                            <input type="number" id="bulk_quantity" name="quantity" min="1" value="{{ old('quantity', 1) }}" disabled class="mt-2 block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+                        </div>
+                        <div>
+                            <label for="bulk_notes" class="block text-sm font-medium leading-6 text-gray-900">Receiving Notes (Optional)</label>
+                            <input type="text" id="bulk_notes" name="notes" value="{{ old('notes') }}" disabled placeholder="e.g. Box of 100pcs M4 screws" class="mt-2 block w-full rounded-md border-0 px-3 py-2 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -237,6 +261,29 @@
             lastProduct = targetProductId;
         }
 
+        function syncTrackingMode() {
+            const productSelect = document.getElementById('product_id');
+            const serializedSection = document.getElementById('serialized_section');
+            const bulkSection = document.getElementById('bulk_section');
+            const bulkQtyInput = document.getElementById('bulk_quantity');
+            const bulkNotesInput = document.getElementById('bulk_notes');
+            if (!productSelect || !serializedSection || !bulkSection) return;
+
+            const selectedId = productSelect.value || '';
+            const prod = allProducts.find(p => String(p.id) === String(selectedId));
+            const isBulk = prod && prod.tracking_type === 'bulk';
+
+            serializedSection.classList.toggle('hidden', isBulk);
+            bulkSection.classList.toggle('hidden', !isBulk);
+            if (bulkQtyInput) {
+                bulkQtyInput.disabled = !isBulk;
+                bulkQtyInput.required = isBulk;
+            }
+            if (bulkNotesInput) {
+                bulkNotesInput.disabled = !isBulk;
+            }
+        }
+
         function onProductSelected() {
             const categorySelect = document.getElementById('category_select');
             const productSelect = document.getElementById('product_id');
@@ -244,6 +291,7 @@
 
             const selectedProductId = productSelect.value || '';
             lastProduct = selectedProductId;
+            syncTrackingMode();
             if (!selectedProductId) return;
 
             const prod = allProducts.find(p => String(p.id) === String(selectedProductId));
@@ -298,6 +346,7 @@
                 if (productSelect && productSelect.tomselect) {
                     productSelect.tomselect.on('change', onProductChange);
                 }
+                syncTrackingMode();
             }, 50);
         });
 

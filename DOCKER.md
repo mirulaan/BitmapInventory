@@ -45,10 +45,10 @@ docker compose up -d --build
 ```
 
 The application will be available at:
-👉 **[http://localhost:8000](http://localhost:8000)**
+👉 **[http://localhost:8626](http://localhost:8626)**
 
 Healthcheck endpoint:
-👉 **[http://localhost:8000/up](http://localhost:8000/up)**
+👉 **[http://localhost:8626/up](http://localhost:8626/up)**
 
 ---
 
@@ -58,7 +58,7 @@ The `docker-compose.yml` file configures the core services connecting to your Po
 
 | Service | Container Name | Description | Port |
 | :--- | :--- | :--- | :--- |
-| `app` | `bitmap_inventory_app` | Web application (Nginx + PHP-FPM + Supervisor) | `8000:80` |
+| `app` | `bitmap_inventory_app` | Web application (Nginx + PHP-FPM + Supervisor) | `8626:80` |
 | `redis` | `bitmap_inventory_redis` | Redis 7 in-memory cache, session, and queue driver | `6379:6379` |
 | `queue` | `bitmap_inventory_queue` | Laravel background queue worker (`artisan queue:work`) | Internal |
 | `scheduler` | `bitmap_inventory_scheduler` | Laravel task scheduler (`artisan schedule:work`) | Internal |
@@ -109,7 +109,7 @@ docker build -t your-registry/bitmap-inventory:latest .
 ### Run Standalone (with SQLite or Managed Database)
 ```bash
 docker run -d \
-  -p 8080:80 \
+  -p 8626:80 \
   -e APP_NAME=BitmapInventory \
   -e APP_ENV=production \
   -e APP_KEY=base64:YOUR_GENERATED_APP_KEY \

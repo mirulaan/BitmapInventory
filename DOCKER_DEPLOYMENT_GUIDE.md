@@ -73,7 +73,7 @@ BitmapInventory uses an optimized **multi-stage build** designed for minimal att
 
 | Service | Container Name | Description | Port |
 | :--- | :--- | :--- | :--- |
-| **`app`** | `bitmap_inventory_app` | Main web server (Nginx + PHP-FPM + Supervisor) | `8000:80` |
+| **`app`** | `bitmap_inventory_app` | Main web server (Nginx + PHP-FPM + Supervisor) | `8626:80` |
 | **`redis`** | `bitmap_inventory_redis` | Redis 7 for caching, sessions, and queue backend | `6379:6379` |
 | **`queue`** | `bitmap_inventory_queue` | Background worker processing async jobs (`artisan queue:work`) | Internal |
 | **`scheduler`** | `bitmap_inventory_scheduler` | Task scheduler executing cron jobs (`artisan schedule:work`) | Internal |
@@ -91,9 +91,9 @@ cp .env.docker.example .env
 ```
 
 Review and adjust `.env` parameters if needed:
-- `APP_URL`: Set to your domain or server IP (e.g., `http://your-server-ip:8000`).
+- `APP_URL`: Set to your domain or server IP (e.g., `http://your-server-ip:8626`).
 - `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`: Configure your PostgreSQL credentials.
-- `APP_PORT`: Default is `8000` (change if port 8000 is occupied).
+- `APP_PORT`: Default is `8626` (change if port 8626 is occupied).
 
 ### Step 2: Generate Application Key
 
@@ -140,8 +140,8 @@ docker compose ps
 All services (`app`, `redis`, `queue`, `scheduler`) should show `Up` or `healthy`.
 
 Access the application in your browser:
-- **Application URL:** [http://localhost:8000](http://localhost:8000)
-- **Health Check Endpoint:** [http://localhost:8000/up](http://localhost:8000/up)
+- **Application URL:** [http://localhost:8626](http://localhost:8626)
+- **Health Check Endpoint:** [http://localhost:8626/up](http://localhost:8626/up)
 
 ---
 
@@ -194,12 +194,12 @@ docker build -t bitmap-inventory:latest .
 docker run -d \
   --name bitmap-inventory \
   --restart unless-stopped \
-  -p 8000:80 \
+  -p 8626:80 \
   -e APP_NAME=BitmapInventory \
   -e APP_ENV=production \
   -e APP_DEBUG=false \
   -e APP_KEY=base64:YOUR_32_BYTE_BASE64_KEY \
-  -e APP_URL=http://your-server-ip:8000 \
+  -e APP_URL=http://your-server-ip:8626 \
   -e DB_CONNECTION=pgsql \
   -e DB_HOST=192.168.100.4 \
   -e DB_PORT=5432 \
@@ -219,7 +219,7 @@ For demo or lightweight standalone deployments without an external database:
 docker run -d \
   --name bitmap-inventory-sqlite \
   --restart unless-stopped \
-  -p 8000:80 \
+  -p 8626:80 \
   -e APP_NAME=BitmapInventory \
   -e APP_ENV=production \
   -e APP_KEY=base64:YOUR_32_BYTE_BASE64_KEY \
@@ -269,7 +269,7 @@ Features in development mode:
 | `APP_ENV` | `production` | Environment (`production`, `local`, `testing`) |
 | `APP_KEY` | *(empty)* | 32-byte base64 application encryption key |
 | `APP_DEBUG` | `false` | Enable detailed stack traces (set `false` in production) |
-| `APP_URL` | `http://localhost:8000` | Canonical application base URL |
+| `APP_URL` | `http://localhost:8626` | Canonical application base URL |
 | `DB_CONNECTION` | `pgsql` | Database driver (`pgsql`, `sqlite`, `mysql`) |
 | `DB_HOST` | `192.168.100.4` | Database server address |
 | `DB_PORT` | `5432` | Database server port |
@@ -333,10 +333,10 @@ docker compose down -v
 
 ## 9. Troubleshooting & FAQs
 
-### Q1: `curl: (7) Failed to connect to localhost port 8000`
+### Q1: `curl: (7) Failed to connect to localhost port 8626`
 - Check container status: `docker compose ps`.
 - Check app startup logs: `docker compose logs app`.
-- Ensure host port `8000` is not in use by another service: `lsof -i :8000` or `netstat -tlpn`.
+- Ensure host port `8626` is not in use by another service: `lsof -i :8626` or `netstat -tlpn`.
 
 ### Q2: Database connection errors (`SQLSTATE[08006] Connection refused`)
 - Ensure PostgreSQL is listening on all network interfaces (`listen_addresses = '*'`) in `postgresql.conf`.

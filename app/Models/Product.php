@@ -16,6 +16,7 @@ class Product extends Model
         'name',
         'brand',
         'category',
+        'tracking_type',
         'unit_price',
         'min_stock_level',
         'description',
@@ -33,6 +34,22 @@ class Product extends Model
     public function inventoryItems(): HasMany
     {
         return $this->hasMany(InventoryItem::class);
+    }
+
+    /**
+     * Determine whether this product is tracked as in-house bulk quantity (no serial numbers).
+     */
+    public function isBulk(): bool
+    {
+        return $this->tracking_type === 'bulk';
+    }
+
+    /**
+     * Determine whether this product is tracked individually by serial number.
+     */
+    public function isSerialized(): bool
+    {
+        return ! $this->isBulk();
     }
 
     /**

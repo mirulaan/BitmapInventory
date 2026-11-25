@@ -46,7 +46,7 @@ Route::middleware(['auth', 'role'])->group(function () {
             Route::post('/', [InventoryWorkflowController::class, 'store'])->name('store');
             Route::get('/{item}/edit', [InventoryWorkflowController::class, 'edit'])->name('edit');
             Route::put('/{item}', [InventoryWorkflowController::class, 'update'])->name('update');
-            
+
             // Internal Warehouse Rack-to-Rack Transfer
             Route::get('/{item}/transfer', [InventoryWorkflowController::class, 'transferForm'])->name('transfer');
             Route::post('/{item}/transfer', [InventoryWorkflowController::class, 'processTransfer'])->name('process_transfer');
@@ -66,6 +66,10 @@ Route::middleware(['auth', 'role'])->group(function () {
             Route::get('/{item}/return', [InventoryWorkflowController::class, 'returnForm'])->name('return');
             Route::post('/{item}/return', [InventoryWorkflowController::class, 'processReturn'])->name('process_return');
 
+            // Extend Loan & Dashboard Status Update
+            Route::post('/{item}/extend-loan', [InventoryWorkflowController::class, 'processExtendLoan'])->name('process_extend_loan');
+            Route::post('/{item}/loan-status', [InventoryWorkflowController::class, 'processLoanStatusUpdate'])->name('process_loan_status');
+
             // Convert Loan to Permanent Sale
             Route::get('/{item}/convert', [InventoryWorkflowController::class, 'convertForm'])->name('convert');
             Route::post('/{item}/convert', [InventoryWorkflowController::class, 'processConvert'])->name('process_convert');
@@ -77,7 +81,11 @@ Route::middleware(['auth', 'role'])->group(function () {
             // Reservation Lifecycle
             Route::get('/{item}/reserve', [InventoryWorkflowController::class, 'reserveForm'])->name('reserve');
             Route::post('/{item}/reserve', [InventoryWorkflowController::class, 'processReserve'])->name('process_reserve');
+            // Release reservation
             Route::post('/{item}/release', [InventoryWorkflowController::class, 'processReleaseReservation'])->name('process_release');
+
+            // Bulk In-House Issue to Project (Out)
+            Route::post('/{item}/issue-bulk', [InventoryWorkflowController::class, 'processIssueBulk'])->name('process_issue_bulk');
 
             // RMA & Defective Repair
             Route::get('/{item}/rma', [InventoryWorkflowController::class, 'rmaForm'])->name('rma');

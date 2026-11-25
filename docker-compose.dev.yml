@@ -11,7 +11,7 @@ services:
       - .:/var/www/html
       - app_storage:/var/www/html/storage
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "${APP_PORT:-8626}:80"
       - "5173:5173"
 
   queue:

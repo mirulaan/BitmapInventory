@@ -45,6 +45,11 @@
                         <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-0.5 rounded-md border border-indigo-100">
                             {{ $product->category }}
                         </span>
+                        @if($product->isBulk())
+                            <span class="text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-md border border-sky-100">
+                                Bulk / In-House
+                            </span>
+                        @endif
                         @if($product->unit_price)
                             <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
                                 RM {{ number_format($product->unit_price, 2) }}
@@ -55,10 +60,14 @@
             </div>
 
             <!-- Unit Breakdown Stats -->
+            @php
+                $inStockCount = $product->isBulk() ? (int) $items->where('status', 'in_stock')->sum('quantity') : $items->where('status', 'in_stock')->count();
+                $totalUnitCount = $product->isBulk() ? (int) $items->sum('quantity') : $items->count();
+            @endphp
             <div class="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 overflow-x-auto">
                 <div class="text-center px-2.5 py-1 shrink-0">
-                    <p class="text-xl font-bold {{ ($product->min_stock_level > 0 && $items->where('status', 'in_stock')->count() <= $product->min_stock_level) ? 'text-rose-600' : 'text-slate-900' }}">
-                        {{ $items->where('status', 'in_stock')->count() }}
+                    <p class="text-xl font-bold {{ ($product->min_stock_level > 0 && $inStockCount <= $product->min_stock_level) ? 'text-rose-600' : 'text-slate-900' }}">
+                        {{ $inStockCount }}
                     </p>
                     <p class="text-2xs font-semibold text-emerald-600 uppercase tracking-wider mt-0.5">In Stock</p>
                 </div>
@@ -79,7 +88,7 @@
                 </div>
                 <div class="h-8 w-px bg-slate-200 shrink-0"></div>
                 <div class="text-center px-2.5 py-1 shrink-0">
-                    <p class="text-xl font-bold text-slate-900">{{ $items->count() }}</p>
+                    <p class="text-xl font-bold text-slate-900">{{ $totalUnitCount }}</p>
                     <p class="text-2xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">Total</p>
                 </div>
             </div>
@@ -182,11 +191,18 @@
                         @forelse($items as $item)
                             <tr class="hover:bg-slate-50/70 transition-colors">
                                 
-                                <!-- Serial Number -->
+                                <!-- Serial Number / Bulk Qty -->
                                 <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm">
                                     <div class="flex items-center gap-2">
                                         <div class="w-2 h-2 rounded-full {{ $item->status === 'in_stock' ? 'bg-emerald-500' : ($item->status === 'on_loan' ? 'bg-amber-500' : ($item->status === 'reserved' ? 'bg-purple-500' : 'bg-rose-500')) }}"></div>
-                                        <span class="font-mono font-bold text-slate-900">{{ $item->serial_number }}</span>
+                                        @if($product->isBulk())
+                                            <span class="font-bold text-slate-900">Qty: {{ number_format($item->quantity) }}</span>
+                                            <span class="inline-flex items-center rounded bg-sky-50 px-1.5 py-0.5 text-2xs font-semibold text-sky-700 border border-sky-200">
+                                                Bulk
+                                            </span>
+                                        @else
+                                            <span class="font-mono font-bold text-slate-900">{{ $item->serial_number }}</span>
+                                        @endif
                                     </div>
                                     <div class="flex items-center gap-2 mt-1">
                                         @if($item->batch_no)
@@ -250,7 +266,23 @@
                                 <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                                     <div class="flex items-center justify-end flex-wrap gap-1.5">
                                         @if(Auth::user()->hasRole('admin', 'warehouse', 'engineer'))
-                                            @if($item->status === 'in_stock')
+                                            @if($product->isBulk())
+                                                @if($item->status === 'in_stock' && $item->quantity > 0)
+                                                    <button
+                                                        type="button"
+                                                        onclick="openBulkIssueModal(this)"
+                                                        data-item-id="{{ $item->id }}"
+                                                        data-product-name="{{ $product->name }}"
+                                                        data-location-name="{{ $item->location?->name ?? 'Warehouse' }}"
+                                                        data-available-qty="{{ $item->quantity }}"
+                                                        class="inline-flex items-center rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors cursor-pointer"
+                                                    >
+                                                        Issue to Project (Out)
+                                                    </button>
+                                                @else
+                                                    <span class="text-xs text-slate-400 italic px-2 py-1">Depleted (0 qty)</span>
+                                                @endif
+                                            @elseif($item->status === 'in_stock')
                                                 <!-- Transfer -->
                                                 <a href="{{ route('inventory.transfer', $item->id) }}" class="inline-flex items-center rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors" title="Move rack">
                                                     Transfer
@@ -344,4 +376,86 @@
             </div>
         </div>
     </div>
+
+    @if($product->isBulk() && Auth::user()->hasRole('admin', 'warehouse', 'engineer'))
+        <!-- Issue Bulk In-House Item to Project Modal -->
+        <div id="bulk-issue-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs" onclick="if (event.target === this) closeBulkIssueModal()">
+            <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+                <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3 class="text-base font-bold text-slate-900 truncate" id="bulk-modal-product">Issue to Project</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Location: <span class="font-semibold text-slate-700" id="bulk-modal-location">-</span>
+                            &middot; Available: <span class="font-bold text-emerald-700" id="bulk-modal-available">0</span>
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeBulkIssueModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer" aria-label="Close modal">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form id="bulk-issue-form" method="POST" action="" class="p-5 space-y-4">
+                    @csrf
+                    <div>
+                        <label for="bulk-issue-qty" class="block text-xs font-semibold text-slate-700 mb-1">Quantity Out <span class="text-rose-500">*</span></label>
+                        <input type="number" id="bulk-issue-qty" name="quantity" min="1" value="1" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
+
+                    <div>
+                        <label for="bulk-issue-project" class="block text-xs font-semibold text-slate-700 mb-1">Project Name / Reference <span class="text-rose-500">*</span></label>
+                        <input type="text" id="bulk-issue-project" name="project_name" required placeholder="e.g. Line 3 Vision Retrofit" class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
+
+                    <div>
+                        <label for="bulk-issue-pic" class="block text-xs font-semibold text-slate-700 mb-1">Person in Charge <span class="text-rose-500">*</span></label>
+                        <input type="text" id="bulk-issue-pic" name="person_in_charge" value="{{ Auth::user()->name }}" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
+
+                    <div>
+                        <label for="bulk-issue-notes" class="block text-xs font-semibold text-slate-700 mb-1">Notes (Optional)</label>
+                        <textarea id="bulk-issue-notes" name="notes" rows="2" placeholder="Optional remarks..." class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"></textarea>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                        <button type="button" onclick="closeBulkIssueModal()" class="rounded-xl bg-white border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">Cancel</button>
+                        <button type="submit" class="rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-violet-500 transition-colors cursor-pointer">Confirm Stock Out</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            function openBulkIssueModal(trigger) {
+                const modal = document.getElementById('bulk-issue-modal');
+                const itemId = trigger.dataset.itemId;
+                const available = parseInt(trigger.dataset.availableQty || '1', 10);
+
+                document.getElementById('bulk-modal-product').textContent = trigger.dataset.productName || 'Issue to Project';
+                document.getElementById('bulk-modal-location').textContent = trigger.dataset.locationName || '-';
+                document.getElementById('bulk-modal-available').textContent = available;
+
+                const qtyInput = document.getElementById('bulk-issue-qty');
+                qtyInput.max = available;
+                qtyInput.value = 1;
+
+                document.getElementById('bulk-issue-form').action = `/inventory/${itemId}/issue-bulk`;
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            function closeBulkIssueModal() {
+                const modal = document.getElementById('bulk-issue-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeBulkIssueModal();
+                }
+            });
+        </script>
+    @endif
 </x-app-layout>

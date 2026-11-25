@@ -41,6 +41,38 @@
             </div>
         </div>
 
+        <!-- Flash Feedback & Validation Errors -->
+        @if(session('success'))
+            <div class="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-center justify-between">
+                <div class="flex items-center gap-2.5 text-emerald-800 text-sm font-semibold">
+                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>{{ session('success') }}</span>
+                </div>
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="rounded-2xl bg-rose-50 border border-rose-200 p-4 flex items-center justify-between">
+                <div class="flex items-center gap-2.5 text-rose-800 text-sm font-semibold">
+                    <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                    </svg>
+                    <span>{{ session('error') }}</span>
+                </div>
+            </div>
+        @endif
+        @if($errors->any())
+            <div class="rounded-2xl bg-rose-50 border border-rose-200 p-4 text-rose-800 text-sm">
+                <p class="font-bold mb-1">Unable to update loan:</p>
+                <ul class="list-disc list-inside text-xs space-y-0.5">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         <!-- KPI Metrics Grid (4 High-Impact Cards) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
@@ -228,6 +260,11 @@
                                                 'label' => 'Loan Returned',
                                                 'dot' => 'bg-teal-500'
                                             ],
+                                            'extend_loan' => [
+                                                'bg' => 'bg-sky-50 text-sky-700 ring-sky-600/20',
+                                                'label' => 'Loan Extended',
+                                                'dot' => 'bg-sky-500'
+                                            ],
                                             'convert_to_sale' => [
                                                 'bg' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
                                                 'label' => 'Loan to Sale',
@@ -237,6 +274,11 @@
                                                 'bg' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
                                                 'label' => 'Direct Sale',
                                                 'dot' => 'bg-emerald-500'
+                                            ],
+                                            'bulk_out' => [
+                                                'bg' => 'bg-violet-50 text-violet-700 ring-violet-600/20',
+                                                'label' => 'Project Out',
+                                                'dot' => 'bg-violet-500'
                                             ],
                                             default => [
                                                 'bg' => 'bg-slate-50 text-slate-700 ring-slate-600/10',
@@ -276,6 +318,13 @@
                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                                     </svg>
                                                     <span class="font-medium text-slate-900">{{ $log->toLocation?->name ?? 'Main Warehouse' }}</span>
+                                                </div>
+                                            @elseif($log->transaction_type === 'bulk_out')
+                                                <div class="inline-flex items-center gap-1.5 text-slate-700">
+                                                    <svg class="w-3.5 h-3.5 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                                                    </svg>
+                                                    <span class="font-medium text-slate-900">Project: {{ $log->reference_number ?? '-' }}</span>
                                                 </div>
                                             @elseif(in_array($log->transaction_type, ['dispatch_loan', 'direct_sale', 'convert_to_sale']))
                                                 <div class="inline-flex items-center gap-1.5 text-slate-700">
@@ -393,6 +442,7 @@
                     </div>
 
                     <div class="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
+                        @php $canManageLoans = Auth::user()->hasRole('admin', 'warehouse', 'engineer'); @endphp
                         @forelse($activeLoans as $loan)
                             <div class="p-4 hover:bg-slate-50 transition-colors space-y-2">
                                 <div class="flex items-start justify-between gap-2">
@@ -401,24 +451,53 @@
                                         <p class="text-xs text-slate-500 font-mono mt-0.5">{{ $loan->serial_number }}</p>
                                     </div>
 
-                                    <!-- Status Pill -->
-                                    @if($loan->is_overdue)
-                                        <span class="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 ring-1 ring-inset ring-rose-600/30 shrink-0 animate-pulse">
-                                            Overdue ({{ $loan->days_overdue }}d)
-                                        </span>
-                                    @elseif($loan->is_expiring_soon)
-                                        <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-inset ring-amber-600/30 shrink-0">
-                                            Due in {{ $loan->days_remaining }}d
-                                        </span>
+                                    <!-- Clickable Loan Status Pill -->
+                                    @if($canManageLoans)
+                                        <button
+                                            type="button"
+                                            onclick="openLoanModal(this, 'status')"
+                                            data-item-id="{{ $loan->id }}"
+                                            data-product-name="{{ $loan->product->name }}"
+                                            data-serial-number="{{ $loan->serial_number }}"
+                                            data-client-name="{{ $loan->client?->company_name ?? 'Client Site' }}"
+                                            data-end-date="{{ $loan->end_date_iso }}"
+                                            data-end-date-formatted="{{ $loan->end_date_formatted }}"
+                                            data-pic="{{ $loan->currentLoan?->person_in_charge ?? '' }}"
+                                            title="Click to modify loan status or extend due date"
+                                            class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs shrink-0 cursor-pointer transition-all hover:ring-2 hover:ring-indigo-400/50 {{ $loan->is_overdue ? 'bg-rose-50 font-bold text-rose-700 ring-1 ring-inset ring-rose-600/30 animate-pulse' : ($loan->is_expiring_soon ? 'bg-amber-50 font-bold text-amber-800 ring-1 ring-inset ring-amber-600/30' : 'bg-slate-50 font-medium text-slate-600 ring-1 ring-inset ring-slate-500/20') }}"
+                                        >
+                                            <span>
+                                                @if($loan->is_overdue)
+                                                    Overdue ({{ $loan->days_overdue }}d)
+                                                @elseif($loan->is_expiring_soon)
+                                                    Due in {{ $loan->days_remaining }}d
+                                                @else
+                                                    Due {{ $loan->end_date_formatted }}
+                                                @endif
+                                            </span>
+                                            <svg class="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+                                            </svg>
+                                        </button>
                                     @else
-                                        <span class="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/20 shrink-0">
-                                            Due {{ $loan->end_date_formatted }}
-                                        </span>
+                                        @if($loan->is_overdue)
+                                            <span class="inline-flex items-center rounded-md bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 ring-1 ring-inset ring-rose-600/30 shrink-0 animate-pulse">
+                                                Overdue ({{ $loan->days_overdue }}d)
+                                            </span>
+                                        @elseif($loan->is_expiring_soon)
+                                            <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-bold text-amber-800 ring-1 ring-inset ring-amber-600/30 shrink-0">
+                                                Due in {{ $loan->days_remaining }}d
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center rounded-md bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/20 shrink-0">
+                                                Due {{ $loan->end_date_formatted }}
+                                            </span>
+                                        @endif
                                     @endif
                                 </div>
 
-                                <div class="flex items-center justify-between pt-1 text-xs">
-                                    <div class="text-slate-600 flex items-center gap-1 truncate max-w-[170px]">
+                                <div class="flex items-center justify-between pt-1 text-xs gap-2">
+                                    <div class="text-slate-600 flex items-center gap-1 truncate max-w-[150px]">
                                         <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                         </svg>
@@ -426,14 +505,55 @@
                                     </div>
 
                                     <!-- Action Buttons -->
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <a href="{{ route('inventory.return', $loan->id) }}" class="rounded-lg bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors" title="Process Return">
-                                            Return
-                                        </a>
-                                        <a href="{{ route('inventory.convert', $loan->id) }}" class="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors" title="Convert to Sale">
-                                            Convert
-                                        </a>
-                                    </div>
+                                    @if($canManageLoans)
+                                        <div class="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                type="button"
+                                                onclick="openLoanModal(this, 'extend')"
+                                                data-item-id="{{ $loan->id }}"
+                                                data-product-name="{{ $loan->product->name }}"
+                                                data-serial-number="{{ $loan->serial_number }}"
+                                                data-client-name="{{ $loan->client?->company_name ?? 'Client Site' }}"
+                                                data-end-date="{{ $loan->end_date_iso }}"
+                                                data-end-date-formatted="{{ $loan->end_date_formatted }}"
+                                                data-pic="{{ $loan->currentLoan?->person_in_charge ?? '' }}"
+                                                class="rounded-lg bg-sky-50 px-2 py-1 text-[11px] font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer"
+                                                title="Extend Loan Due Date"
+                                            >
+                                                Extend
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick="openLoanModal(this, 'return')"
+                                                data-item-id="{{ $loan->id }}"
+                                                data-product-name="{{ $loan->product->name }}"
+                                                data-serial-number="{{ $loan->serial_number }}"
+                                                data-client-name="{{ $loan->client?->company_name ?? 'Client Site' }}"
+                                                data-end-date="{{ $loan->end_date_iso }}"
+                                                data-end-date-formatted="{{ $loan->end_date_formatted }}"
+                                                data-pic="{{ $loan->currentLoan?->person_in_charge ?? '' }}"
+                                                class="rounded-lg bg-teal-50 px-2 py-1 text-[11px] font-semibold text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors cursor-pointer"
+                                                title="Process Return"
+                                            >
+                                                Return
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onclick="openLoanModal(this, 'convert')"
+                                                data-item-id="{{ $loan->id }}"
+                                                data-product-name="{{ $loan->product->name }}"
+                                                data-serial-number="{{ $loan->serial_number }}"
+                                                data-client-name="{{ $loan->client?->company_name ?? 'Client Site' }}"
+                                                data-end-date="{{ $loan->end_date_iso }}"
+                                                data-end-date-formatted="{{ $loan->end_date_formatted }}"
+                                                data-pic="{{ $loan->currentLoan?->person_in_charge ?? '' }}"
+                                                class="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                                                title="Convert to Sale"
+                                            >
+                                                Convert
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         @empty
@@ -535,4 +655,270 @@
         </div>
 
     </div>
+
+    @if(Auth::user()->hasRole('admin', 'warehouse', 'engineer'))
+        <!-- Manage Loan Modal (Modify Status & Extend Due Date) -->
+        <div id="loan-manage-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs" onclick="if (event.target === this) closeLoanModal()">
+            <div class="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+                <!-- Modal Header -->
+                <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h3 class="text-base font-bold text-slate-900 truncate" id="modal-product-name">Manage Loan</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            S/N: <span class="font-mono font-semibold text-slate-700" id="modal-serial-number">-</span>
+                            &middot; <span id="modal-client-name">-</span>
+                        </p>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Current Due Date: <span class="font-semibold text-slate-700" id="modal-current-due">-</span>
+                        </p>
+                    </div>
+                    <button type="button" onclick="closeLoanModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer" aria-label="Close modal">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Mode Tabs -->
+                <div class="px-5 pt-3.5">
+                    <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                        <button type="button" id="tab-btn-status" onclick="switchLoanModalTab('status')" class="py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                            Modify Status
+                        </button>
+                        <button type="button" id="tab-btn-extend" onclick="switchLoanModalTab('extend')" class="py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                            Extend Loan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab 1: Modify Status Form -->
+                <form id="loan-status-form" method="POST" action="" class="p-5 space-y-4">
+                    @csrf
+                    <div>
+                        <label for="modal-target-status" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">New Loan Status</label>
+                        <select id="modal-target-status" name="target_status" onchange="updateStatusFields()" class="block w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="in_stock">Returned to Warehouse (In Stock)</option>
+                            <option value="sold">Converted to Sale (Sold)</option>
+                            <option value="rma_defective">RMA / Defective Repair</option>
+                            <option value="on_loan">Keep On Loan (Extend Due Date)</option>
+                        </select>
+                    </div>
+
+                    <!-- Fields for: Return to Stock -->
+                    <div id="fields-in_stock" class="space-y-3">
+                        <div>
+                            <label for="modal-return-location" class="block text-xs font-semibold text-slate-700 mb-1">Return Warehouse Location <span class="text-rose-500">*</span></label>
+                            <select id="modal-return-location" name="location_id" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                                <option value="">-- Select Warehouse Rack --</option>
+                                @foreach($warehouseLocations as $loc)
+                                    <option value="{{ $loc->id }}">{{ $loc->full_path }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Fields for: Convert to Sale -->
+                    <div id="fields-sold" class="space-y-3 hidden">
+                        <div>
+                            <label for="modal-sale-pic" class="block text-xs font-semibold text-slate-700 mb-1">Person in Charge <span class="text-rose-500">*</span></label>
+                            <input type="text" id="modal-sale-pic" name="person_in_charge" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="e.g. John Doe">
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="modal-po-customer" class="block text-xs font-semibold text-slate-700 mb-1">Customer PO <span class="text-rose-500">*</span></label>
+                                <input type="text" id="modal-po-customer" name="po_customer" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="PO-CUST-001">
+                            </div>
+                            <div>
+                                <label for="modal-po-supplier" class="block text-xs font-semibold text-slate-700 mb-1">Supplier PO <span class="text-rose-500">*</span></label>
+                                <input type="text" id="modal-po-supplier" name="po_supplier" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="PO-SUP-001">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fields for: RMA / Defective -->
+                    <div id="fields-rma_defective" class="space-y-3 hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="modal-rma-ticket" class="block text-xs font-semibold text-slate-700 mb-1">RMA Ticket No. <span class="text-rose-500">*</span></label>
+                                <input type="text" id="modal-rma-ticket" name="rma_ticket_no" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="RMA-2026-001">
+                            </div>
+                            <div>
+                                <label for="modal-rma-vendor" class="block text-xs font-semibold text-slate-700 mb-1">Vendor / Repair Center <span class="text-rose-500">*</span></label>
+                                <input type="text" id="modal-rma-vendor" name="vendor_name" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="Vendor Name">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="modal-rma-pic" class="block text-xs font-semibold text-slate-700 mb-1">Person in Charge <span class="text-rose-500">*</span></label>
+                            <input type="text" id="modal-rma-pic" name="person_in_charge" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="Technician Name">
+                        </div>
+                        <div>
+                            <label for="modal-rma-issue" class="block text-xs font-semibold text-slate-700 mb-1">Issue Description <span class="text-rose-500">*</span></label>
+                            <textarea id="modal-rma-issue" name="issue_description" rows="2" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="Describe the hardware defect..."></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Fields for: Keep On Loan (Extend) -->
+                    <div id="fields-on_loan" class="space-y-3 hidden">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Quick Extend</label>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="applyExtendDays(7, 'modal-status-end-date')" class="rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer">+7 Days</button>
+                                <button type="button" onclick="applyExtendDays(14, 'modal-status-end-date')" class="rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer">+14 Days</button>
+                                <button type="button" onclick="applyExtendDays(30, 'modal-status-end-date')" class="rounded-lg bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer">+30 Days</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label for="modal-status-end-date" class="block text-xs font-semibold text-slate-700 mb-1">New Due Date <span class="text-rose-500">*</span></label>
+                            <input type="date" id="modal-status-end-date" name="new_end_date" min="{{ now()->toDateString() }}" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="modal-status-notes" class="block text-xs font-semibold text-slate-700 mb-1">Notes (Optional)</label>
+                        <textarea id="modal-status-notes" name="notes" rows="2" class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="Add optional remarks for audit log..."></textarea>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                        <button type="button" onclick="closeLoanModal()" class="rounded-xl bg-white border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">Cancel</button>
+                        <button type="submit" class="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 transition-colors cursor-pointer">Update Loan Status</button>
+                    </div>
+                </form>
+
+                <!-- Tab 2: Extend Loan Form -->
+                <form id="loan-extend-form" method="POST" action="" class="p-5 space-y-4 hidden">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Quick Extend</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" onclick="applyExtendDays(7, 'modal-extend-end-date')" class="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer">+7 Days</button>
+                            <button type="button" onclick="applyExtendDays(14, 'modal-extend-end-date')" class="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer">+14 Days</button>
+                            <button type="button" onclick="applyExtendDays(30, 'modal-extend-end-date')" class="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer">+30 Days</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="modal-extend-end-date" class="block text-xs font-semibold text-slate-700 mb-1">New Loan Due Date <span class="text-rose-500">*</span></label>
+                        <input type="date" id="modal-extend-end-date" name="new_end_date" min="{{ now()->toDateString() }}" required class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                    </div>
+
+                    <div>
+                        <label for="modal-extend-notes" class="block text-xs font-semibold text-slate-700 mb-1">Extension Reason / Notes (Optional)</label>
+                        <textarea id="modal-extend-notes" name="notes" rows="2" class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" placeholder="e.g. Client requested 2 additional weeks for PoC evaluation"></textarea>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                        <button type="button" onclick="closeLoanModal()" class="rounded-xl bg-white border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer">Cancel</button>
+                        <button type="submit" class="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-sky-500 transition-colors cursor-pointer">Confirm Extension</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            let activeLoanEndDate = '';
+
+            function openLoanModal(trigger, defaultMode) {
+                const modal = document.getElementById('loan-manage-modal');
+                const itemId = trigger.dataset.itemId;
+
+                document.getElementById('modal-product-name').textContent = trigger.dataset.productName || 'Manage Loan';
+                document.getElementById('modal-serial-number').textContent = trigger.dataset.serialNumber || '-';
+                document.getElementById('modal-client-name').textContent = trigger.dataset.clientName || 'Client Site';
+                document.getElementById('modal-current-due').textContent = trigger.dataset.endDateFormatted || 'Open Term';
+
+                activeLoanEndDate = trigger.dataset.endDate || '';
+
+                const statusForm = document.getElementById('loan-status-form');
+                const extendForm = document.getElementById('loan-extend-form');
+                statusForm.action = `/inventory/${itemId}/loan-status`;
+                extendForm.action = `/inventory/${itemId}/extend-loan`;
+
+                const pic = trigger.dataset.pic || '';
+                document.getElementById('modal-sale-pic').value = pic;
+                document.getElementById('modal-rma-pic').value = pic;
+
+                applyExtendDays(14, 'modal-extend-end-date');
+                applyExtendDays(14, 'modal-status-end-date');
+
+                const targetStatusSelect = document.getElementById('modal-target-status');
+                if (defaultMode === 'convert') {
+                    targetStatusSelect.value = 'sold';
+                } else {
+                    targetStatusSelect.value = 'in_stock';
+                }
+                updateStatusFields();
+                switchLoanModalTab(defaultMode === 'extend' ? 'extend' : 'status');
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+
+            function closeLoanModal() {
+                const modal = document.getElementById('loan-manage-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            function switchLoanModalTab(tab) {
+                const statusForm = document.getElementById('loan-status-form');
+                const extendForm = document.getElementById('loan-extend-form');
+                const statusBtn = document.getElementById('tab-btn-status');
+                const extendBtn = document.getElementById('tab-btn-extend');
+
+                if (tab === 'extend') {
+                    statusForm.classList.add('hidden');
+                    extendForm.classList.remove('hidden');
+                    extendBtn.className = 'py-2 px-3 rounded-lg text-xs font-bold bg-white text-sky-700 shadow-2xs transition-all cursor-pointer';
+                    statusBtn.className = 'py-2 px-3 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all cursor-pointer';
+                } else {
+                    extendForm.classList.add('hidden');
+                    statusForm.classList.remove('hidden');
+                    statusBtn.className = 'py-2 px-3 rounded-lg text-xs font-bold bg-white text-indigo-700 shadow-2xs transition-all cursor-pointer';
+                    extendBtn.className = 'py-2 px-3 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition-all cursor-pointer';
+                }
+            }
+
+            function updateStatusFields() {
+                const selected = document.getElementById('modal-target-status').value;
+                const groups = ['in_stock', 'sold', 'rma_defective', 'on_loan'];
+
+                groups.forEach((group) => {
+                    const container = document.getElementById(`fields-${group}`);
+                    const isActive = group === selected;
+                    container.classList.toggle('hidden', !isActive);
+                    container.querySelectorAll('input, select, textarea').forEach((el) => {
+                        el.disabled = !isActive;
+                    });
+                });
+            }
+
+            function applyExtendDays(days, inputId) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                let baseDate = today;
+                if (activeLoanEndDate) {
+                    const parsed = new Date(activeLoanEndDate + 'T00:00:00');
+                    if (!isNaN(parsed.getTime()) && parsed > today) {
+                        baseDate = parsed;
+                    }
+                }
+
+                const target = new Date(baseDate);
+                target.setDate(target.getDate() + days);
+
+                const year = target.getFullYear();
+                const month = String(target.getMonth() + 1).padStart(2, '0');
+                const day = String(target.getDate()).padStart(2, '0');
+
+                document.getElementById(inputId).value = `${year}-${month}-${day}`;
+            }
+
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeLoanModal();
+                }
+            });
+        </script>
+    @endif
 </x-app-layout>

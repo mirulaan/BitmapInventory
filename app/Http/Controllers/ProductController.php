@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\InventoryItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
@@ -16,20 +17,18 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::withCount([
-            'inventoryItems as total_qty',
-            'inventoryItems as in_stock_qty' => function ($q) {
+        $query = Product::withSum('inventoryItems as total_qty', 'quantity')
+            ->withSum(['inventoryItems as in_stock_qty' => function ($q) {
                 $q->where('status', 'in_stock');
-            },
-            'inventoryItems as on_loan_qty' => function ($q) {
+            }], 'quantity')
+            ->withSum(['inventoryItems as on_loan_qty' => function ($q) {
                 $q->where('status', 'on_loan');
-            },
-            'inventoryItems as sold_qty' => function ($q) {
+            }], 'quantity')
+            ->withSum(['inventoryItems as sold_qty' => function ($q) {
                 $q->where('status', 'sold');
-            },
-        ]);
+            }], 'quantity');
 
-        $like = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        $like = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -102,6 +101,7 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'brand' => 'nullable|string|max:255',
             'category' => 'required|string|max:255',
+            'tracking_type' => 'nullable|in:serialized,bulk',
             'unit_price' => 'nullable|numeric|min:0',
             'min_stock_level' => 'nullable|integer|min:0',
             'description' => 'nullable|string',
@@ -123,6 +123,7 @@ class ProductController extends Controller
             'name' => $validated['name'],
             'brand' => $validated['brand'] ?? null,
             'category' => $validated['category'],
+            'tracking_type' => $validated['tracking_type'] ?? 'serialized',
             'unit_price' => $validated['unit_price'] ?? null,
             'min_stock_level' => (int) ($validated['min_stock_level'] ?? 0),
             'description' => $validated['description'] ?? null,
@@ -150,10 +151,11 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $validated = $request->validate([
-            'sku' => 'required|string|max:255|unique:products,sku,' . $product->id,
+            'sku' => 'required|string|max:255|unique:products,sku,'.$product->id,
             'name' => 'required|string|max:255',
             'brand' => 'nullable|string|max:255',
             'category' => 'required|string|max:255',
+            'tracking_type' => 'nullable|in:serialized,bulk',
             'unit_price' => 'nullable|numeric|min:0',
             'min_stock_level' => 'nullable|integer|min:0',
             'description' => 'nullable|string',
@@ -192,6 +194,7 @@ class ProductController extends Controller
             'name' => $validated['name'],
             'brand' => $validated['brand'] ?? null,
             'category' => $validated['category'],
+            'tracking_type' => $validated['tracking_type'] ?? $product->tracking_type ?? 'serialized',
             'unit_price' => $validated['unit_price'] ?? null,
             'min_stock_level' => (int) ($validated['min_stock_level'] ?? 0),
             'description' => $validated['description'] ?? null,
@@ -207,12 +210,12 @@ class ProductController extends Controller
     protected function storeBase64Image(string $base64Data): ?string
     {
         // Expecting data:image/jpeg;base64,... or data:image/png;base64,... or data:image/svg+xml;base64,...
-        if (!preg_match('/^data:image\/([a-zA-Z0-9\+\-\.]+);base64,/', $base64Data, $type)) {
+        if (! preg_match('/^data:image\/([a-zA-Z0-9\+\-\.]+);base64,/', $base64Data, $type)) {
             return null;
         }
 
         $imageType = strtolower($type[1]);
-        if (!in_array($imageType, ['jpg', 'jpeg', 'png', 'webp', 'svg', 'svg+xml'])) {
+        if (! in_array($imageType, ['jpg', 'jpeg', 'png', 'webp', 'svg', 'svg+xml'])) {
             return null;
         }
 
@@ -223,7 +226,7 @@ class ProductController extends Controller
         }
 
         $extension = ($imageType === 'jpeg' || $imageType === 'jpg') ? 'jpg' : (($imageType === 'svg' || $imageType === 'svg+xml') ? 'svg' : $imageType);
-        $filename = 'products/' . uniqid('prod_', true) . '.' . $extension;
+        $filename = 'products/'.uniqid('prod_', true).'.'.$extension;
 
         Storage::disk('public')->put($filename, $decoded);
 
@@ -267,13 +270,14 @@ class ProductController extends Controller
                             $source = $resized;
                         }
 
-                        $filename = 'products/' . uniqid('prod_', true) . '.jpg';
+                        $filename = 'products/'.uniqid('prod_', true).'.jpg';
                         ob_start();
                         imagejpeg($source, null, 82);
                         $compressedData = ob_get_clean();
                         imagedestroy($source);
 
                         Storage::disk('public')->put($filename, $compressedData);
+
                         return $filename;
                     }
                 } catch (\Throwable $e) {

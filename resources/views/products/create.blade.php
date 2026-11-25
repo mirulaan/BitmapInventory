@@ -157,6 +157,19 @@
                             @error('unit_price') <p class="mt-1 text-xs text-rose-600 font-medium">{{ $message }}</p> @enderror
                         </div>
 
+                        <!-- Tracking Type -->
+                        <div class="sm:col-span-2">
+                            <label for="tracking_type" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                                Tracking Mode
+                            </label>
+                            <select id="tracking_type" name="tracking_type" class="block w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+                                <option value="serialized" {{ old('tracking_type', 'serialized') === 'serialized' ? 'selected' : '' }}>Serialized (Track by S/N)</option>
+                                <option value="bulk" {{ old('tracking_type') === 'bulk' ? 'selected' : '' }}>Bulk / In-House (Qty Only)</option>
+                            </select>
+                            <p class="mt-1 text-[11px] text-slate-400">Use Bulk for screws, nuts, cables (in/out by project).</p>
+                            @error('tracking_type') <p class="mt-1 text-xs text-rose-600 font-medium">{{ $message }}</p> @enderror
+                        </div>
+
                         <!-- Min Stock Alert Threshold -->
                         <div class="sm:col-span-2">
                             <label for="min_stock_level" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">

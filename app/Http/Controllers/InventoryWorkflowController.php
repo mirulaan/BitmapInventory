@@ -10,6 +10,7 @@ use App\Models\Location;
 use App\Models\Product;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class InventoryWorkflowController extends Controller
 {
@@ -18,23 +19,21 @@ class InventoryWorkflowController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::withCount([
-            'inventoryItems as total_qty',
-            'inventoryItems as in_stock_qty' => function ($q) {
+        $query = Product::withSum('inventoryItems as total_qty', 'quantity')
+            ->withSum(['inventoryItems as in_stock_qty' => function ($q) {
                 $q->where('status', 'in_stock');
-            },
-            'inventoryItems as on_loan_qty' => function ($q) {
+            }], 'quantity')
+            ->withSum(['inventoryItems as on_loan_qty' => function ($q) {
                 $q->where('status', 'on_loan');
-            },
-            'inventoryItems as sold_qty' => function ($q) {
+            }], 'quantity')
+            ->withSum(['inventoryItems as sold_qty' => function ($q) {
                 $q->where('status', 'sold');
-            },
-        ]);
+            }], 'quantity');
 
         // Search by Product Name, SKU, or Brand
         if ($request->filled('search')) {
             $search = $request->search;
-            $like = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $like = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
             $query->where(function ($q) use ($search, $like) {
                 $q->where('name', $like, "%{$search}%")
                     ->orWhere('sku', $like, "%{$search}%")
@@ -113,7 +112,7 @@ class InventoryWorkflowController extends Controller
      */
     protected function buildAuditQuery(Request $request)
     {
-        $like = \Illuminate\Support\Facades\DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+        $like = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
 
         $query = InventoryTransaction::with([
             'item.product',
@@ -215,7 +214,7 @@ class InventoryWorkflowController extends Controller
         $query = $this->buildAuditQuery($request);
         $transactions = $query->orderBy('created_at', 'desc')->get();
 
-        $filename = 'audit_ledger_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'audit_ledger_'.now()->format('Ymd_His').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -229,7 +228,7 @@ class InventoryWorkflowController extends Controller
             $handle = fopen('php://output', 'w');
 
             // Add UTF-8 BOM for clean Excel rendering
-            fputs($handle, "\xEF\xBB\xBF");
+            fwrite($handle, "\xEF\xBB\xBF");
 
             fputcsv($handle, [
                 'Log ID',
@@ -308,7 +307,7 @@ class InventoryWorkflowController extends Controller
     }
 
     /**
-     * Store bulk serialized hardware units into inventory.
+     * Store bulk serialized hardware units or non-serialized bulk quantity into inventory.
      */
     public function store(Request $request)
     {
@@ -317,6 +316,71 @@ class InventoryWorkflowController extends Controller
             'location_id' => 'required|exists:locations,id',
             'batch_no' => 'nullable|string|max:100',
             'unit_cost' => 'nullable|numeric|min:0',
+        ]);
+
+        $product = Product::findOrFail($request->product_id);
+        $batchNo = $request->filled('batch_no') ? trim($request->batch_no) : null;
+        $unitCost = $request->filled('unit_cost') ? (float) $request->unit_cost : 0.00;
+
+        if ($product->isBulk()) {
+            $validated = $request->validate([
+                'quantity' => 'required|integer|min:1|max:1000000',
+                'notes' => 'nullable|string|max:1000',
+            ]);
+
+            $qty = (int) $validated['quantity'];
+
+            DB::transaction(function () use ($product, $request, $batchNo, $unitCost, $qty, $validated) {
+                $existingQuery = InventoryItem::where('product_id', $product->id)
+                    ->where('location_id', $request->location_id)
+                    ->where('status', 'in_stock')
+                    ->whereNull('serial_number');
+
+                if ($batchNo !== null) {
+                    $existingQuery->where('batch_no', $batchNo);
+                } else {
+                    $existingQuery->whereNull('batch_no');
+                }
+
+                $item = $existingQuery->first();
+
+                if ($item) {
+                    $item->increment('quantity', $qty);
+                    if ($unitCost > 0) {
+                        $item->update(['unit_cost' => $unitCost]);
+                    }
+                } else {
+                    $item = InventoryItem::create([
+                        'product_id' => $product->id,
+                        'location_id' => $request->location_id,
+                        'serial_number' => null,
+                        'batch_no' => $batchNo,
+                        'unit_cost' => $unitCost,
+                        'quantity' => $qty,
+                        'status' => 'in_stock',
+                    ]);
+                }
+
+                InventoryTransaction::create([
+                    'inventory_item_id' => $item->id,
+                    'user_id' => auth()->id() ?? 1,
+                    'transaction_type' => 'stock_in',
+                    'from_location_id' => null,
+                    'to_location_id' => $request->location_id,
+                    'from_status' => null,
+                    'to_status' => 'in_stock',
+                    'batch_no' => $batchNo,
+                    'unit_cost' => $unitCost,
+                    'quantity' => $qty,
+                    'notes' => $validated['notes'] ?? ('Bulk stock received'.($batchNo ? " (Batch: {$batchNo})" : '')),
+                ]);
+            });
+
+            return redirect()->route('inventory.product', $product->id)
+                ->with('success', "{$qty} units of {$product->name} added to in-house bulk stock.");
+        }
+
+        $request->validate([
             'serial_numbers' => 'required|array|min:1',
             'serial_numbers.*' => 'required|string|distinct|unique:inventory_items,serial_number',
         ], [
@@ -324,9 +388,6 @@ class InventoryWorkflowController extends Controller
             'serial_numbers.*.unique' => 'One of the serial numbers you entered is already in the database.',
             'serial_numbers.*.distinct' => 'You entered the same serial number twice in the table.',
         ]);
-
-        $batchNo = $request->filled('batch_no') ? trim($request->batch_no) : null;
-        $unitCost = $request->filled('unit_cost') ? (float) $request->unit_cost : 0.00;
 
         foreach ($request->serial_numbers as $sn) {
             $item = InventoryItem::create([
@@ -350,11 +411,59 @@ class InventoryWorkflowController extends Controller
                 'batch_no' => $batchNo,
                 'unit_cost' => $unitCost,
                 'quantity' => 1,
-                'notes' => 'Received into stock' . ($batchNo ? " (Batch: {$batchNo})" : ''),
+                'notes' => 'Received into stock'.($batchNo ? " (Batch: {$batchNo})" : ''),
             ]);
         }
 
-        return redirect()->route('inventory.index')->with('success', count($request->serial_numbers) . ' new hardware items successfully added to stock.');
+        return redirect()->route('inventory.index')->with('success', count($request->serial_numbers).' new hardware items successfully added to stock.');
+    }
+
+    /**
+     * Issue / stock out bulk in-house consumables to a specific project.
+     */
+    public function processIssueBulk(Request $request, InventoryItem $item)
+    {
+        $item->loadMissing('product');
+
+        if (! $item->product || ! $item->product->isBulk() || $item->status !== 'in_stock') {
+            return redirect()->back()->with('error', 'Only in-stock bulk items can be issued to a project.');
+        }
+
+        if ($item->quantity <= 0) {
+            return redirect()->back()->with('error', 'No remaining stock available to issue.');
+        }
+
+        $validated = $request->validate([
+            'quantity' => 'required|integer|min:1|max:'.$item->quantity,
+            'project_name' => 'required|string|max:255',
+            'person_in_charge' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $issueQty = (int) $validated['quantity'];
+
+        DB::transaction(function () use ($item, $validated, $issueQty) {
+            $item->decrement('quantity', $issueQty);
+
+            InventoryTransaction::create([
+                'inventory_item_id' => $item->id,
+                'user_id' => auth()->id() ?? 1,
+                'transaction_type' => 'bulk_out',
+                'from_location_id' => $item->location_id,
+                'to_location_id' => null,
+                'from_status' => 'in_stock',
+                'to_status' => 'in_house_used',
+                'quantity' => $issueQty,
+                'batch_no' => $item->batch_no,
+                'unit_cost' => $item->unit_cost,
+                'person_in_charge' => $validated['person_in_charge'],
+                'reference_number' => $validated['project_name'],
+                'notes' => $validated['notes'] ?? "Issued {$issueQty} units for project: {$validated['project_name']}",
+            ]);
+        });
+
+        return redirect()->route('inventory.product', $item->product_id)
+            ->with('success', "Issued {$issueQty} units to project \"{$validated['project_name']}\".");
     }
 
     /**
@@ -514,6 +623,184 @@ class InventoryWorkflowController extends Controller
         ]);
 
         return redirect()->route('inventory.index')->with('success', 'Hardware successfully returned and placed back into stock.');
+    }
+
+    /**
+     * Extend the due date of an active loan.
+     */
+    public function processExtendLoan(Request $request, InventoryItem $item)
+    {
+        if ($item->status !== 'on_loan') {
+            return redirect()->back()->with('error', 'Only items currently on loan can be extended.');
+        }
+
+        $validated = $request->validate([
+            'new_end_date' => 'required|date|after_or_equal:today',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        $newEndDate = Carbon::parse($validated['new_end_date'])->toDateString();
+
+        DB::transaction(function () use ($item, $newEndDate, $validated) {
+            $currentLoan = $item->currentLoan;
+            $previousEndDate = $currentLoan?->loan_end_date
+                ? Carbon::parse($currentLoan->loan_end_date)->format('d M Y')
+                : 'Open Term';
+
+            if ($currentLoan) {
+                $currentLoan->update([
+                    'loan_end_date' => $newEndDate,
+                ]);
+            }
+
+            $extensionNote = "Extended from {$previousEndDate} to ".Carbon::parse($newEndDate)->format('d M Y');
+            $combinedNotes = ! empty($validated['notes'])
+                ? "{$validated['notes']} | {$extensionNote}"
+                : $extensionNote;
+
+            InventoryTransaction::create([
+                'inventory_item_id' => $item->id,
+                'user_id' => auth()->id() ?? 1,
+                'transaction_type' => 'extend_loan',
+                'from_location_id' => $item->location_id,
+                'to_location_id' => $item->location_id,
+                'from_status' => 'on_loan',
+                'to_status' => 'on_loan',
+                'quantity' => $item->quantity,
+                'batch_no' => $item->batch_no,
+                'unit_cost' => $item->unit_cost,
+                'person_in_charge' => $currentLoan?->person_in_charge,
+                'loan_form_no' => $currentLoan?->loan_form_no,
+                'loan_start_date' => $currentLoan?->loan_start_date,
+                'loan_end_date' => $newEndDate,
+                'notes' => $combinedNotes,
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Loan due date extended to '.Carbon::parse($newEndDate)->format('d M Y').'.');
+    }
+
+    /**
+     * Modify an active loan's status directly from the dashboard.
+     */
+    public function processLoanStatusUpdate(Request $request, InventoryItem $item)
+    {
+        if ($item->status !== 'on_loan') {
+            return redirect()->back()->with('error', 'Only items currently on loan can be updated.');
+        }
+
+        $validated = $request->validate([
+            'target_status' => 'required|in:on_loan,in_stock,sold,rma_defective',
+        ]);
+
+        $targetStatus = $validated['target_status'];
+
+        if ($targetStatus === 'on_loan') {
+            return $this->processExtendLoan($request, $item);
+        }
+
+        if ($targetStatus === 'in_stock') {
+            $data = $request->validate([
+                'location_id' => 'required|exists:locations,id',
+                'notes' => 'nullable|string|max:1000',
+            ]);
+
+            $oldLocationId = $item->location_id;
+
+            DB::transaction(function () use ($item, $data, $oldLocationId) {
+                $item->update([
+                    'status' => 'in_stock',
+                    'location_id' => $data['location_id'],
+                    'client_id' => null,
+                ]);
+
+                InventoryTransaction::create([
+                    'inventory_item_id' => $item->id,
+                    'user_id' => auth()->id() ?? 1,
+                    'transaction_type' => 'return_loan',
+                    'from_location_id' => $oldLocationId,
+                    'to_location_id' => $data['location_id'],
+                    'from_status' => 'on_loan',
+                    'to_status' => 'in_stock',
+                    'quantity' => $item->quantity,
+                    'batch_no' => $item->batch_no,
+                    'unit_cost' => $item->unit_cost,
+                    'notes' => $data['notes'] ?? null,
+                ]);
+            });
+
+            return redirect()->back()->with('success', 'Loan marked as returned to warehouse stock.');
+        }
+
+        if ($targetStatus === 'sold') {
+            $data = $request->validate([
+                'person_in_charge' => 'required|string|max:255',
+                'po_customer' => 'required|string|max:255',
+                'po_supplier' => 'required|string|max:255',
+                'notes' => 'nullable|string|max:1000',
+            ]);
+
+            $currentLocationId = $item->location_id;
+            $lastLoan = $item->currentLoan;
+
+            DB::transaction(function () use ($item, $data, $currentLocationId, $lastLoan) {
+                $item->update([
+                    'status' => 'sold',
+                ]);
+
+                InventoryTransaction::create([
+                    'inventory_item_id' => $item->id,
+                    'user_id' => auth()->id() ?? 1,
+                    'transaction_type' => 'convert_to_sale',
+                    'from_location_id' => $currentLocationId,
+                    'to_location_id' => $currentLocationId,
+                    'from_status' => 'on_loan',
+                    'to_status' => 'sold',
+                    'quantity' => $item->quantity,
+                    'batch_no' => $item->batch_no,
+                    'unit_cost' => $item->unit_cost,
+                    'person_in_charge' => $data['person_in_charge'],
+                    'loan_form_no' => $lastLoan?->loan_form_no,
+                    'po_customer' => $data['po_customer'],
+                    'po_supplier' => $data['po_supplier'],
+                    'notes' => $data['notes'] ?? null,
+                ]);
+            });
+
+            return redirect()->back()->with('success', 'Loan converted to permanent sale.');
+        }
+
+        $data = $request->validate([
+            'rma_ticket_no' => 'required|string|max:255',
+            'vendor_name' => 'required|string|max:255',
+            'issue_description' => 'required|string|max:1000',
+            'person_in_charge' => 'required|string|max:255',
+            'notes' => 'nullable|string|max:1000',
+        ]);
+
+        DB::transaction(function () use ($item, $data) {
+            $item->update([
+                'status' => 'rma_defective',
+            ]);
+
+            InventoryTransaction::create([
+                'inventory_item_id' => $item->id,
+                'user_id' => auth()->id() ?? 1,
+                'transaction_type' => 'send_rma',
+                'from_location_id' => $item->location_id,
+                'to_location_id' => null,
+                'from_status' => 'on_loan',
+                'to_status' => 'rma_defective',
+                'quantity' => $item->quantity,
+                'batch_no' => $item->batch_no,
+                'unit_cost' => $item->unit_cost,
+                'person_in_charge' => $data['person_in_charge'],
+                'reference_number' => $data['rma_ticket_no'],
+                'notes' => "RMA Ticket: {$data['rma_ticket_no']} | Vendor: {$data['vendor_name']} | Defect: {$data['issue_description']}".(! empty($data['notes']) ? " | Notes: {$data['notes']}" : ''),
+            ]);
+        });
+
+        return redirect()->back()->with('success', 'Loan item marked as RMA / Defective.');
     }
 
     /**
@@ -703,6 +990,7 @@ class InventoryWorkflowController extends Controller
         }
 
         $clients = Client::orderBy('company_name')->get();
+
         return view('inventory.reserve', compact('item', 'clients'));
     }
 
@@ -812,7 +1100,7 @@ class InventoryWorkflowController extends Controller
             'unit_cost' => $item->unit_cost,
             'person_in_charge' => $request->person_in_charge,
             'reference_number' => $request->rma_ticket_no,
-            'notes' => "RMA Ticket: {$request->rma_ticket_no} | Vendor: {$request->vendor_name} | Defect: {$request->issue_description}" . ($request->notes ? " | Notes: {$request->notes}" : ''),
+            'notes' => "RMA Ticket: {$request->rma_ticket_no} | Vendor: {$request->vendor_name} | Defect: {$request->issue_description}".($request->notes ? " | Notes: {$request->notes}" : ''),
         ]);
 
         return redirect()->route('inventory.product', $item->product_id)->with('success', 'Hardware unit logged under RMA / Defective repair.');
@@ -828,6 +1116,7 @@ class InventoryWorkflowController extends Controller
         }
 
         $locations = Location::where('type', '!=', 'client_site')->orderBy('name')->get();
+
         return view('inventory.return_rma', compact('item', 'locations'));
     }
 
@@ -859,7 +1148,7 @@ class InventoryWorkflowController extends Controller
             'batch_no' => $item->batch_no,
             'unit_cost' => $item->unit_cost,
             'person_in_charge' => $request->person_in_charge,
-            'notes' => 'Returned from repair: ' . $request->resolution_notes,
+            'notes' => 'Returned from repair: '.$request->resolution_notes,
         ]);
 
         return redirect()->route('inventory.product', $item->product_id)->with('success', 'Repaired hardware received back into warehouse stock.');
@@ -902,7 +1191,7 @@ class InventoryWorkflowController extends Controller
             'unit_cost' => $item->unit_cost,
             'person_in_charge' => $request->person_in_charge,
             'reference_number' => $request->reason,
-            'notes' => 'Decommissioned/Scrapped: ' . $request->approval_notes,
+            'notes' => 'Decommissioned/Scrapped: '.$request->approval_notes,
         ]);
 
         return redirect()->route('inventory.product', $item->product_id)->with('success', 'Hardware unit decommissioned and permanently removed from active stock.');
@@ -992,7 +1281,7 @@ class InventoryWorkflowController extends Controller
     public function exportValuationCsv()
     {
         $products = Product::with(['inventoryItems'])->get();
-        $filename = 'inventory_valuation_' . now()->format('Ymd_His') . '.csv';
+        $filename = 'inventory_valuation_'.now()->format('Ymd_His').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -1001,7 +1290,7 @@ class InventoryWorkflowController extends Controller
 
         $callback = function () use ($products) {
             $handle = fopen('php://output', 'w');
-            fputs($handle, "\xEF\xBB\xBF"); // UTF-8 BOM
+            fwrite($handle, "\xEF\xBB\xBF"); // UTF-8 BOM
 
             fputcsv($handle, [
                 'SKU',
