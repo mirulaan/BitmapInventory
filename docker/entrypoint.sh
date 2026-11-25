@@ -36,7 +36,19 @@ fi
 # Auto-generate APP_KEY if missing
 if [ -z "$APP_KEY" ]; then
     echo "Notice: APP_KEY not set. Auto-generating application key..."
-    php artisan key:generate --no-interaction --force || true
+    if [ ! -f /var/www/html/.env ]; then
+        touch /var/www/html/.env
+        chown www-data:www-data /var/www/html/.env
+    fi
+    GENERATED_KEY=$(php artisan key:generate --show --no-interaction 2>/dev/null || true)
+    if [ -n "$GENERATED_KEY" ]; then
+        export APP_KEY="$GENERATED_KEY"
+        if grep -q "^APP_KEY=" /var/www/html/.env; then
+            sed -i "s|^APP_KEY=.*|APP_KEY=${GENERATED_KEY}|" /var/www/html/.env
+        else
+            echo "APP_KEY=${GENERATED_KEY}" >> /var/www/html/.env
+        fi
+    fi
 fi
 
 # Run database migrations if enabled
